@@ -1,0 +1,26 @@
+{
+  "name": "jsonspecs",
+  "version": "1.0.0",
+  "description": "Composable validation pipelines powered by JSON rules",
+  "type": "commonjs",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "src/**/*.js",
+    "README.md",
+    "OPERATORS.md"
+  ],
+  "keywords": [
+    "validation",
+    "rules-engine",
+    "json",
+    "declarative",
+    "pipeline"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
