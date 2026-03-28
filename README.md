@@ -1,6 +1,8 @@
 # JSONSpecs
 
-Declarative validation rules engine. Rules are JSON files. The engine compiles them, runs them against any payload, and returns structured results with `ERROR`, `WARNING`, and `EXCEPTION` levels, full issue list, and execution trace. Zero external dependencies.
+Declarative validation rules engine for Node.js.
+
+Rules are JSON files. The engine compiles them, runs them against any payload, and returns structured results with `ERROR`, `WARNING`, and `EXCEPTION` levels, full issue list, and execution trace. Zero external dependencies.
 
 ```
 npm install jsonspecs
@@ -10,7 +12,7 @@ npm install jsonspecs
 
 Rules are individual JSON files. A pipeline composes them into a scenario. The engine compiles them once and runs against any payload.
 
-**Step 1: write atomic rules** (one file per rule):
+**Step 1 write atomic rules** (one file per rule):
 
 `rules/library/person/first_name_required.json`
 
@@ -62,7 +64,7 @@ Rules are individual JSON files. A pipeline composes them into a scenario. The e
 }
 ```
 
-**Step 2: compose rules into a pipeline:**
+**Step 2 compose rules into a pipeline:**
 
 `rules/pipelines/registration/pipeline.json`
 
@@ -82,7 +84,7 @@ Rules are individual JSON files. A pipeline composes them into a scenario. The e
 }
 ```
 
-**Step 3: compile and run:**
+**Step 3 compile and run:**
 
 ```js
 const { createEngine, Operators } = require("jsonspecs");
@@ -151,22 +153,31 @@ The payload can be a nested JSON object or a pre-flattened dot-notation map both
 
 ```js
 {
-  status: "OK" | "OK_WITH_WARNINGS" | "ERROR" | "EXCEPTION",
+  status: "OK" | "OK_WITH_WARNINGS" | "ERROR" | "EXCEPTION" | "ABORT",
   control: "CONTINUE" | "STOP",
-  issues: [
-    {
-      kind: "ISSUE",
-      level: "ERROR" | "WARNING" | "EXCEPTION",
-      code: "PERSON.FIRST_NAME.REQUIRED",
-      message: "First name is required",
-      field: "person.firstName",
-      ruleId: "library.person.name_required",
-      actual: "",       // value that caused the failure
-      expected: ...     // rule's expected value or dictionary ref, if applicable
-    }
-  ]
+  issues: [ ... ],  // see below
+  trace: [ ... ],   // execution trace, always present (pass { trace: false } to suppress)
+  // only present when status === "ABORT":
+  error: { message: string, stack?: string }
 }
 ```
+
+Each issue:
+
+```js
+{
+  kind: "ISSUE",
+  level: "ERROR" | "WARNING" | "EXCEPTION",
+  code: "PERSON.FIRST_NAME.REQUIRED",
+  message: "First name is required",
+  field: "person.firstName",
+  ruleId: "library.person.name_required",
+  actual: "",       // value that caused the failure
+  expected: ...     // rule's expected value or dictionary ref, if applicable
+}
+```
+
+> **`ABORT`** is returned when an unexpected engine fault occurs (bug in a custom operator, corrupt compiled object, etc.). It is not a validation result — it means the engine itself failed. `issues[]` contains whatever was accumulated before the fault.
 
 ### `deepGet(payload, field)`
 
@@ -298,6 +309,20 @@ The compiler validates all references and reports every unresolvable one at comp
 | `"OK_WITH_WARNINGS"` | Passed, but has soft `WARNING`-level issues worth surfacing |
 | `"ERROR"`            | One or more `ERROR`-level issues                            |
 | `"EXCEPTION"`        | Pipeline was stopped by an `EXCEPTION`-level rule           |
+| `"ABORT"`            | Engine fault (unexpected runtime error). Not a validation result. |
+
+## Public API
+
+The following exports are **stable** and covered by semantic versioning:
+
+| Export | Description |
+| --- | --- |
+| `createEngine(options)` | Creates an engine instance |
+| `Operators` | Built-in operator pack |
+| `CompilationError` | Thrown by `engine.compile()` on invalid artifacts |
+| `deepGet(payload, field)` | Field lookup helper for custom operators |
+
+Everything under `src/**` is **internal** and may change between minor versions. Do not import from `src/` directly.
 
 ## Custom operators
 
@@ -308,36 +333,43 @@ Quick example adding a custom check operator:
 ```js
 const { createEngine, Operators, deepGet } = require("jsonspecs");
 
-const is_apple = (rule, ctx) => {
-  const got = deepGet(ctx.payload, rule.field);
-  if (!got.ok) return { status: "FAIL" };
-  return {
-    status: got.value === "apple" ? "OK" : "FAIL",
-    actual: got.value,
-  };
+const myOperators = {
+  check: {
+    ...Operators.check,
+
+    // Custom check: value must match one of allowed patterns (not just exact strings)
+    matches_any_pattern(rule, ctx) {
+      const got = deepGet(ctx.payload, rule.field);
+      if (!got.ok || got.value == null) return { status: "FAIL" };
+      const patterns = Array.isArray(rule.value) ? rule.value : [rule.value];
+      const matched = patterns.some((p) =>
+        new RegExp(p).test(String(got.value)),
+      );
+      return { status: matched ? "OK" : "FAIL", actual: got.value };
+    },
+  },
+  predicate: {
+    ...Operators.predicate,
+  },
 };
 
-const operators = {
-  check: { ...Operators.check, is_apple },
-  predicate: { ...Operators.predicate },
-};
-
-const engine = createEngine({ operators });
+const engine = createEngine({ operators: myOperators });
 ```
 
 Then use it in a rule artifact:
 
 ```json
 {
-  "id": "library.fruit.must_be_apple",
+  "id": "library.address.postal_code",
   "type": "rule",
-  "description": "Field must equal apple",
+  "description": "Postal code must match RU or international format",
   "role": "check",
-  "operator": "is_apple",
+  "operator": "matches_any_pattern",
   "level": "ERROR",
-  "code": "FRUIT.NOT_APPLE",
-  "message": "Only apples are accepted here",
-  "field": "order.fruit"
+  "code": "ADDR.POSTAL.FORMAT",
+  "message": "Postal code format is invalid",
+  "field": "address.postalCode",
+  "value": ["^\\d{6}$", "^[A-Z]{1,2}\\d{1,2}[A-Z]?\\s?\\d[A-Z]{2}$"]
 }
 ```
 
@@ -352,16 +384,16 @@ Full reference with examples: [OPERATORS.md](./OPERATORS.md).
 | `equals`                            | check + predicate | Field equals `value`                               |
 | `not_equals`                        | check + predicate | Field does not equal `value`                       |
 | `matches_regex`                     | check + predicate | Field matches regex in `value`                     |
+| `length_equals`                     | check             | String or array length equals `value`              |
+| `length_max`                        | check             | String or array length ≤ `value`                   |
 | `contains`                          | check + predicate | String contains substring `value`                  |
 | `greater_than`                      | check + predicate | Field > `value`                                    |
 | `less_than`                         | check + predicate | Field < `value`                                    |
 | `in_dictionary`                     | check + predicate | Value exists in named dictionary                   |
+| `any_filled`                        | check             | At least one field from `fields` list is non-empty |
 | `field_equals_field`                | check + predicate | `field` == `value_field`                           |
 | `field_not_equals_field`            | check + predicate | `field` != `value_field`                           |
 | `field_less_than_field`             | check + predicate | `field` < `value_field`                            |
 | `field_greater_than_field`          | check + predicate | `field` > `value_field`                            |
 | `field_less_or_equal_than_field`    | check + predicate | `field` ≤ `value_field`                            |
 | `field_greater_or_equal_than_field` | check + predicate | `field` ≥ `value_field`                            |
-| `any_filled`                        | check             | At least one field from `fields` list is non-empty |
-| `length_equals`                     | check             | String or array length equals `value`              |
-| `length_max`                        | check             | String or array length ≤ `value`                   |

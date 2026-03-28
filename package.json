@@ -1,7 +1,7 @@
 {
   "name": "jsonspecs",
   "version": "1.0.0",
-  "description": "Composable validation pipelines powered by JSON rules. Zero dependencies.",
+  "description": "Composable validation pipelines powered by JSON rules",
   "type": "commonjs",
   "main": "index.js",
   "types": "./index.d.ts",
@@ -34,21 +34,19 @@
     "pipeline",
     "business-rules"
   ],
-  "author": "",
+  "author": "jsonspecs contributors",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": " https://github.com/catindev/jsonspecs"
   },
   "bugs": {
-    "url": ""
+    "url": " https://github.com/catindev/jsonspecs/issues"
   },
-  "homepage": "",
+  "homepage": " https://github.com/catindev/jsonspecs#readme",
   "engines": {
     "node": ">=18"
   },
   "dependencies": {},
-  "devDependencies": {
-    "node": ">=18"
-  }
+  "devDependencies": {}
 }

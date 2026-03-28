@@ -4,18 +4,18 @@ All notable changes to this project will be documented in this file.
 
 Format: [Semantic Versioning](https://semver.org/)
 
-## [1.0.0] 2026
+---
+
+## [1.0.0] — 2024
 
 ### Initial release
 
 **Core engine**
-
-- `createEngine({ operators })` creates engine instance bound to operator pack
-- `engine.compile(artifacts, options?)` compiles artifact array, returns `compiled` object
-- `engine.runPipeline(compiled, pipelineId, payload)` runs a named entrypoint pipeline
+- `createEngine({ operators })` — creates engine instance bound to operator pack
+- `engine.compile(artifacts, options?)` — compiles artifact array, returns `compiled` object
+- `engine.runPipeline(compiled, pipelineId, payload)` — runs a named entrypoint pipeline
 
 **Compiler (7 phases)**
-
 - Phase 1: artifact registry with duplicate detection
 - Phase 2: schema validation per artifact type
 - Phase 3: error code uniqueness across check rules
@@ -24,7 +24,6 @@ Format: [Semantic Versioning](https://semver.org/)
 - Phase 7: DAG validation (cycle detection)
 
 **Runtime**
-
 - Accumulates all issues in a single pass (does not stop on ERROR)
 - EXCEPTION level stops the pipeline immediately
 - Strict pipeline groups escalate to EXCEPTION if any check fails
@@ -35,7 +34,6 @@ Format: [Semantic Versioning](https://semver.org/)
 - `$context.*` field references for runtime context injection
 
 **Built-in operators**
-
 - 17 check operators: `not_empty`, `is_empty`, `equals`, `not_equals`, `contains`,
   `matches_regex`, `in_dictionary`, `greater_than`, `less_than`, `length_equals`,
   `length_max`, `any_filled`, `field_equals_field`, `field_not_equals_field`,
@@ -44,7 +42,6 @@ Format: [Semantic Versioning](https://semver.org/)
 - 13 predicate operators (same names, predicate semantics)
 
 **Fixed in 1.0.0**
-
 - `matches_regex`: invalid regex pattern now caught at compile time with `CompilationError`
 - `matches_regex`: added optional `flags` field (e.g. `"flags": "i"` for case-insensitive)
 - `runPipeline`: added optional `{ trace: false }` option to suppress trace collection

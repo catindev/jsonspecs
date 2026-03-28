@@ -99,35 +99,21 @@ describe("runner — status OK_WITH_WARNINGS", () => {
 describe("runner — EXCEPTION stops pipeline", () => {
   it("stops after EXCEPTION and does not run subsequent rules", () => {
     const r1 = rule("library.r1", "not_empty", "doc", "EXCEPTION", "DOC.BLOCK");
-    const r2 = rule(
-      "library.r2",
-      "not_empty",
-      "name",
-      "ERROR",
-      "NAME.REQUIRED",
-    );
+    const r2 = rule("library.r2", "not_empty", "name", "ERROR", "NAME.REQUIRED");
     const p = pipeline("p", [{ rule: "library.r1" }, { rule: "library.r2" }]);
     const compiled = compile([r1, r2, p]);
     const result = engine.runPipeline(compiled, "p", { doc: "", name: "" });
     assert.equal(result.status, "EXCEPTION");
     assert.equal(result.control, "STOP");
     // r2 should not have run
-    assert.ok(
-      !result.issues.some((i) => i.code === "NAME.REQUIRED"),
-      "NAME.REQUIRED should not appear after EXCEPTION",
-    );
+    assert.ok(!result.issues.some((i) => i.code === "NAME.REQUIRED"),
+      "NAME.REQUIRED should not appear after EXCEPTION");
   });
 });
 
 describe("runner — accumulates all issues (no early stop on ERROR)", () => {
   it("collects issues from both rules when both fail", () => {
-    const r1 = rule(
-      "library.r1",
-      "not_empty",
-      "name",
-      "ERROR",
-      "NAME.REQUIRED",
-    );
+    const r1 = rule("library.r1", "not_empty", "name", "ERROR", "NAME.REQUIRED");
     const r2 = rule("library.r2", "not_empty", "inn", "ERROR", "INN.REQUIRED");
     const p = pipeline("p", [{ rule: "library.r1" }, { rule: "library.r2" }]);
     const compiled = compile([r1, r2, p]);
@@ -141,40 +127,28 @@ describe("runner — accumulates all issues (no early stop on ERROR)", () => {
 
 describe("runner — nested JSON payload", () => {
   it("accepts nested JSON and resolves dot-notation fields correctly", () => {
-    const r = rule(
-      "library.r",
-      "not_empty",
-      "person.name",
-      "ERROR",
-      "NAME.REQUIRED",
-    );
+    const r = rule("library.r", "not_empty", "person.name", "ERROR", "NAME.REQUIRED");
     const p = pipeline("p", [{ rule: "library.r" }]);
     const compiled = compile([r, p]);
     assert.equal(
       engine.runPipeline(compiled, "p", { person: { name: "Ivan" } }).status,
-      "OK",
+      "OK"
     );
     assert.equal(
       engine.runPipeline(compiled, "p", { person: { name: "" } }).status,
-      "ERROR",
+      "ERROR"
     );
   });
 });
 
 describe("runner — flat map payload", () => {
   it("accepts flat map payload", () => {
-    const r = rule(
-      "library.r",
-      "not_empty",
-      "person.name",
-      "ERROR",
-      "NAME.REQUIRED",
-    );
+    const r = rule("library.r", "not_empty", "person.name", "ERROR", "NAME.REQUIRED");
     const p = pipeline("p", [{ rule: "library.r" }]);
     const compiled = compile([r, p]);
     assert.equal(
       engine.runPipeline(compiled, "p", { "person.name": "Ivan" }).status,
-      "OK",
+      "OK"
     );
   });
 });
@@ -183,13 +157,7 @@ describe("runner — flat map payload", () => {
 
 describe("runner — wildcard field check", () => {
   it("checks all matching array elements", () => {
-    const r = rule(
-      "library.r",
-      "not_empty",
-      "items[*].name",
-      "ERROR",
-      "ITEM.NAME.REQUIRED",
-    );
+    const r = rule("library.r", "not_empty", "items[*].name", "ERROR", "ITEM.NAME.REQUIRED");
     const p = pipeline("p", [{ rule: "library.r" }]);
     const compiled = compile([r, p]);
     const result = engine.runPipeline(compiled, "p", {
@@ -205,28 +173,17 @@ describe("runner — wildcard field check", () => {
 
 describe("runner — condition: skips block when predicate is false", () => {
   it("does not run checks when when-predicate is false", () => {
-    const pred = predicate("library.pred_foreign", "equals", "isForeign", {
-      value: true,
-    });
-    const check = rule(
-      "library.check_tin",
-      "not_empty",
-      "tin",
-      "ERROR",
-      "TIN.REQUIRED",
-    );
+    const pred = predicate("library.pred_foreign", "equals", "isForeign", { value: true });
+    const check = rule("library.check_tin", "not_empty", "tin", "ERROR", "TIN.REQUIRED");
     const cond = condition(
       "library.cond_foreign_block",
       { all: ["library.pred_foreign"] },
-      [{ rule: "library.check_tin" }],
+      [{ rule: "library.check_tin" }]
     );
     const p = pipeline("p", [{ condition: "library.cond_foreign_block" }]);
     const compiled = compile([pred, check, cond, p]);
     // isForeign = false → block skipped → tin not checked
-    const result = engine.runPipeline(compiled, "p", {
-      isForeign: false,
-      tin: "",
-    });
+    const result = engine.runPipeline(compiled, "p", { isForeign: false, tin: "" });
     assert.equal(result.status, "OK");
     assert.equal(result.issues.length, 0);
   });
@@ -234,28 +191,17 @@ describe("runner — condition: skips block when predicate is false", () => {
 
 describe("runner — condition: runs block when predicate is true", () => {
   it("runs checks when when-predicate is true", () => {
-    const pred = predicate("library.pred_foreign", "equals", "isForeign", {
-      value: true,
-    });
-    const check = rule(
-      "library.check_tin",
-      "not_empty",
-      "tin",
-      "ERROR",
-      "TIN.REQUIRED",
-    );
+    const pred = predicate("library.pred_foreign", "equals", "isForeign", { value: true });
+    const check = rule("library.check_tin", "not_empty", "tin", "ERROR", "TIN.REQUIRED");
     const cond = condition(
       "library.cond_foreign_block",
       { all: ["library.pred_foreign"] },
-      [{ rule: "library.check_tin" }],
+      [{ rule: "library.check_tin" }]
     );
     const p = pipeline("p", [{ condition: "library.cond_foreign_block" }]);
     const compiled = compile([pred, check, cond, p]);
     // isForeign = true → block runs → tin missing → error
-    const result = engine.runPipeline(compiled, "p", {
-      isForeign: true,
-      tin: "",
-    });
+    const result = engine.runPipeline(compiled, "p", { isForeign: true, tin: "" });
     assert.equal(result.status, "ERROR");
     assert.equal(result.issues[0].code, "TIN.REQUIRED");
   });
@@ -265,44 +211,27 @@ describe("runner — condition: runs block when predicate is true", () => {
 
 describe("runner — matches_regex", () => {
   it("passes when value matches pattern", () => {
-    const r = rule("library.r", "matches_regex", "inn", "ERROR", "INN.FORMAT", {
-      value: "^\\d{12}$",
-    });
+    const r = rule("library.r", "matches_regex", "inn", "ERROR", "INN.FORMAT",
+      { value: "^\\d{12}$" });
     const p = pipeline("p", [{ rule: "library.r" }]);
     const compiled = compile([r, p]);
-    assert.equal(
-      engine.runPipeline(compiled, "p", { inn: "123456789012" }).status,
-      "OK",
-    );
+    assert.equal(engine.runPipeline(compiled, "p", { inn: "123456789012" }).status, "OK");
   });
 
   it("fails when value does not match pattern", () => {
-    const r = rule("library.r", "matches_regex", "inn", "ERROR", "INN.FORMAT", {
-      value: "^\\d{12}$",
-    });
+    const r = rule("library.r", "matches_regex", "inn", "ERROR", "INN.FORMAT",
+      { value: "^\\d{12}$" });
     const p = pipeline("p", [{ rule: "library.r" }]);
     const compiled = compile([r, p]);
-    assert.equal(
-      engine.runPipeline(compiled, "p", { inn: "abc" }).status,
-      "ERROR",
-    );
+    assert.equal(engine.runPipeline(compiled, "p", { inn: "abc" }).status, "ERROR");
   });
 
   it("flags: i makes match case-insensitive", () => {
-    const r = rule(
-      "library.r",
-      "matches_regex",
-      "code",
-      "ERROR",
-      "CODE.FORMAT",
-      { value: "^[a-z]+$", flags: "i" },
-    );
+    const r = rule("library.r", "matches_regex", "code", "ERROR", "CODE.FORMAT",
+      { value: "^[a-z]+$", flags: "i" });
     const p = pipeline("p", [{ rule: "library.r" }]);
     const compiled = compile([r, p]);
-    assert.equal(
-      engine.runPipeline(compiled, "p", { code: "ABC" }).status,
-      "OK",
-    );
+    assert.equal(engine.runPipeline(compiled, "p", { code: "ABC" }).status, "OK");
   });
 });
 
@@ -322,12 +251,7 @@ describe("runner — trace option", () => {
     const r = rule("library.r", "not_empty", "x", "ERROR", "X");
     const p = pipeline("p", [{ rule: "library.r" }]);
     const compiled = compile([r, p]);
-    const result = engine.runPipeline(
-      compiled,
-      "p",
-      { x: "v" },
-      { trace: false },
-    );
+    const result = engine.runPipeline(compiled, "p", { x: "v" }, { trace: false });
     assert.ok(Array.isArray(result.trace));
     assert.equal(result.trace.length, 0);
   });

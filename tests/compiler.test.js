@@ -45,7 +45,7 @@ describe("compile — duplicate artifact id", () => {
         assert.ok(e instanceof CompilationError);
         assert.ok(e.errors.some((s) => s.includes("Duplicate artifact id")));
         return true;
-      },
+      }
     );
   });
 });
@@ -54,11 +54,7 @@ describe("compile — duplicate artifact id", () => {
 
 describe("compile — check rule missing level/code/message", () => {
   it("throws CompilationError with all three errors", () => {
-    const bad = makeRule({
-      level: undefined,
-      code: undefined,
-      message: undefined,
-    });
+    const bad = makeRule({ level: undefined, code: undefined, message: undefined });
     assert.throws(
       () => engine.compile([bad]),
       (e) => {
@@ -67,7 +63,7 @@ describe("compile — check rule missing level/code/message", () => {
         assert.ok(e.errors.some((s) => s.includes("code")));
         assert.ok(e.errors.some((s) => s.includes("message")));
         return true;
-      },
+      }
     );
   });
 });
@@ -78,16 +74,14 @@ describe("compile — duplicate error code across rules", () => {
   it("throws CompilationError", () => {
     const r1 = makeRule({ id: "library.test.r1", code: "SAME.CODE" });
     const r2 = makeRule({ id: "library.test.r2", code: "SAME.CODE" });
-    const pipe = makePipeline({
-      flow: [{ rule: "library.test.r1" }, { rule: "library.test.r2" }],
-    });
+    const pipe = makePipeline({ flow: [{ rule: "library.test.r1" }, { rule: "library.test.r2" }] });
     assert.throws(
       () => engine.compile([r1, r2, pipe]),
       (e) => {
         assert.ok(e instanceof CompilationError);
         assert.ok(e.errors.some((s) => s.includes("SAME.CODE")));
         return true;
-      },
+      }
     );
   });
 });
@@ -96,18 +90,14 @@ describe("compile — duplicate error code across rules", () => {
 
 describe("compile — pipeline references missing rule", () => {
   it("throws CompilationError", () => {
-    const pipe = makePipeline({
-      flow: [{ rule: "library.test.does_not_exist" }],
-    });
+    const pipe = makePipeline({ flow: [{ rule: "library.test.does_not_exist" }] });
     assert.throws(
       () => engine.compile([pipe]),
       (e) => {
         assert.ok(e instanceof CompilationError);
-        assert.ok(
-          e.errors.some((s) => s.includes("library.test.does_not_exist")),
-        );
+        assert.ok(e.errors.some((s) => s.includes("library.test.does_not_exist")));
         return true;
-      },
+      }
     );
   });
 });
@@ -129,15 +119,11 @@ describe("compile — matches_regex with invalid regex pattern", () => {
       (e) => {
         assert.ok(e instanceof CompilationError);
         assert.ok(
-          e.errors.some(
-            (s) =>
-              s.includes("invalid regex") ||
-              s.includes("Invalid regular expression"),
-          ),
-          `Expected regex error in: ${e.errors.join("; ")}`,
+          e.errors.some((s) => s.includes("invalid regex") || s.includes("Invalid regular expression")),
+          `Expected regex error in: ${e.errors.join("; ")}`
         );
         return true;
-      },
+      }
     );
   });
 });
@@ -185,7 +171,7 @@ describe("compile — pipeline cycle detection", () => {
         assert.ok(e instanceof CompilationError);
         assert.ok(e.errors.some((s) => s.toLowerCase().includes("cycle")));
         return true;
-      },
+      }
     );
   });
 });
