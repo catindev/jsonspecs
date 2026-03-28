@@ -1,5 +1,10 @@
 # JSONSpecs
 
+[![CI](https://github.com/catindev/jsonspecs/actions/workflows/ci.yml/badge.svg)](https://github.com/catindev/jsonspecs/actions)
+[![npm](https://img.shields.io/npm/v/jsonspecs)](https://www.npmjs.com/package/jsonspecs)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Node 18+](https://img.shields.io/badge/Node-18%2B-green)](https://nodejs.org/)
+
 Декларативный движок валидационных правил. Правила описываются в JSON-файлах. Движок компилирует их, запускает на payload любой глубины вложенности и возвращает структурированный результат с уровнями `ERROR`, `WARNING` и `EXCEPTION`, полным списком issue и execution trace. Без внешних зависимостей.
 
 ```

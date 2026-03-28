@@ -1,5 +1,10 @@
 # JSONSpecs
 
+[![CI](https://github.com/catindev/jsonspecs/actions/workflows/ci.yml/badge.svg)](https://github.com/catindev/jsonspecs/actions)
+[![npm](https://img.shields.io/npm/v/jsonspecs)](https://www.npmjs.com/package/jsonspecs)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Node 18+](https://img.shields.io/badge/Node-18%2B-green)](https://nodejs.org/)
+
 Declarative validation rules engine for Node.js.
 
 Rules are JSON files. The engine compiles them, runs them against any payload, and returns structured results with `ERROR`, `WARNING`, and `EXCEPTION` levels, full issue list, and execution trace. Zero external dependencies.
@@ -303,24 +308,24 @@ The compiler validates all references and reports every unresolvable one at comp
 | `WARNING`   | Soft check, data quality hint | Accumulated, does **not** stop the pipeline |
 | `EXCEPTION` | Hard block, cannot proceed    | Immediately **stops** the pipeline          |
 
-| `status`             | Meaning                                                     |
-| -------------------- | ----------------------------------------------------------- |
-| `"OK"`               | No issues at all                                            |
-| `"OK_WITH_WARNINGS"` | Passed, but has soft `WARNING`-level issues worth surfacing |
-| `"ERROR"`            | One or more `ERROR`-level issues                            |
-| `"EXCEPTION"`        | Pipeline was stopped by an `EXCEPTION`-level rule           |
+| `status`             | Meaning                                                           |
+| -------------------- | ----------------------------------------------------------------- |
+| `"OK"`               | No issues at all                                                  |
+| `"OK_WITH_WARNINGS"` | Passed, but has soft `WARNING`-level issues worth surfacing       |
+| `"ERROR"`            | One or more `ERROR`-level issues                                  |
+| `"EXCEPTION"`        | Pipeline was stopped by an `EXCEPTION`-level rule                 |
 | `"ABORT"`            | Engine fault (unexpected runtime error). Not a validation result. |
 
 ## Public API
 
 The following exports are **stable** and covered by semantic versioning:
 
-| Export | Description |
-| --- | --- |
-| `createEngine(options)` | Creates an engine instance |
-| `Operators` | Built-in operator pack |
-| `CompilationError` | Thrown by `engine.compile()` on invalid artifacts |
-| `deepGet(payload, field)` | Field lookup helper for custom operators |
+| Export                    | Description                                       |
+| ------------------------- | ------------------------------------------------- |
+| `createEngine(options)`   | Creates an engine instance                        |
+| `Operators`               | Built-in operator pack                            |
+| `CompilationError`        | Thrown by `engine.compile()` on invalid artifacts |
+| `deepGet(payload, field)` | Field lookup helper for custom operators          |
 
 Everything under `src/**` is **internal** and may change between minor versions. Do not import from `src/` directly.
 
