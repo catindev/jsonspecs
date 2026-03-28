@@ -1,8 +1,6 @@
 # JSONSpecs
 
-Declarative validation rules engine for Node.js.
-
-Rules are JSON files. The engine compiles them, runs them against any payload, and returns structured results with `ERROR`, `WARNING`, and `EXCEPTION` levels, full issue list, and execution trace. Zero external dependencies.
+Declarative validation rules engine. Rules are JSON files. The engine compiles them, runs them against any payload, and returns structured results with `ERROR`, `WARNING`, and `EXCEPTION` levels, full issue list, and execution trace. Zero external dependencies.
 
 ```
 npm install jsonspecs
@@ -12,7 +10,7 @@ npm install jsonspecs
 
 Rules are individual JSON files. A pipeline composes them into a scenario. The engine compiles them once and runs against any payload.
 
-**Step 1 write atomic rules** (one file per rule):
+**Step 1: write atomic rules** (one file per rule):
 
 `rules/library/person/first_name_required.json`
 
@@ -64,7 +62,7 @@ Rules are individual JSON files. A pipeline composes them into a scenario. The e
 }
 ```
 
-**Step 2 compose rules into a pipeline:**
+**Step 2: compose rules into a pipeline:**
 
 `rules/pipelines/registration/pipeline.json`
 
@@ -84,7 +82,7 @@ Rules are individual JSON files. A pipeline composes them into a scenario. The e
 }
 ```
 
-**Step 3 compile and run:**
+**Step 3: compile and run:**
 
 ```js
 const { createEngine, Operators } = require("jsonspecs");
@@ -310,43 +308,36 @@ Quick example adding a custom check operator:
 ```js
 const { createEngine, Operators, deepGet } = require("jsonspecs");
 
-const myOperators = {
-  check: {
-    ...Operators.check,
-
-    // Custom check: value must match one of allowed patterns (not just exact strings)
-    matches_any_pattern(rule, ctx) {
-      const got = deepGet(ctx.payload, rule.field);
-      if (!got.ok || got.value == null) return { status: "FAIL" };
-      const patterns = Array.isArray(rule.value) ? rule.value : [rule.value];
-      const matched = patterns.some((p) =>
-        new RegExp(p).test(String(got.value)),
-      );
-      return { status: matched ? "OK" : "FAIL", actual: got.value };
-    },
-  },
-  predicate: {
-    ...Operators.predicate,
-  },
+const is_apple = (rule, ctx) => {
+  const got = deepGet(ctx.payload, rule.field);
+  if (!got.ok) return { status: "FAIL" };
+  return {
+    status: got.value === "apple" ? "OK" : "FAIL",
+    actual: got.value,
+  };
 };
 
-const engine = createEngine({ operators: myOperators });
+const operators = {
+  check: { ...Operators.check, is_apple },
+  predicate: { ...Operators.predicate },
+};
+
+const engine = createEngine({ operators });
 ```
 
 Then use it in a rule artifact:
 
 ```json
 {
-  "id": "library.address.postal_code",
+  "id": "library.fruit.must_be_apple",
   "type": "rule",
-  "description": "Postal code must match RU or international format",
+  "description": "Field must equal apple",
   "role": "check",
-  "operator": "matches_any_pattern",
+  "operator": "is_apple",
   "level": "ERROR",
-  "code": "ADDR.POSTAL.FORMAT",
-  "message": "Postal code format is invalid",
-  "field": "address.postalCode",
-  "value": ["^\\d{6}$", "^[A-Z]{1,2}\\d{1,2}[A-Z]?\\s?\\d[A-Z]{2}$"]
+  "code": "FRUIT.NOT_APPLE",
+  "message": "Only apples are accepted here",
+  "field": "order.fruit"
 }
 ```
 
@@ -361,16 +352,16 @@ Full reference with examples: [OPERATORS.md](./OPERATORS.md).
 | `equals`                            | check + predicate | Field equals `value`                               |
 | `not_equals`                        | check + predicate | Field does not equal `value`                       |
 | `matches_regex`                     | check + predicate | Field matches regex in `value`                     |
-| `length_equals`                     | check             | String or array length equals `value`              |
-| `length_max`                        | check             | String or array length ≤ `value`                   |
 | `contains`                          | check + predicate | String contains substring `value`                  |
 | `greater_than`                      | check + predicate | Field > `value`                                    |
 | `less_than`                         | check + predicate | Field < `value`                                    |
 | `in_dictionary`                     | check + predicate | Value exists in named dictionary                   |
-| `any_filled`                        | check             | At least one field from `fields` list is non-empty |
 | `field_equals_field`                | check + predicate | `field` == `value_field`                           |
 | `field_not_equals_field`            | check + predicate | `field` != `value_field`                           |
 | `field_less_than_field`             | check + predicate | `field` < `value_field`                            |
 | `field_greater_than_field`          | check + predicate | `field` > `value_field`                            |
 | `field_less_or_equal_than_field`    | check + predicate | `field` ≤ `value_field`                            |
 | `field_greater_or_equal_than_field` | check + predicate | `field` ≥ `value_field`                            |
+| `any_filled`                        | check             | At least one field from `fields` list is non-empty |
+| `length_equals`                     | check             | String or array length equals `value`              |
+| `length_max`                        | check             | String or array length ≤ `value`                   |

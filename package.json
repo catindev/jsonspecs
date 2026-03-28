@@ -1,26 +1,54 @@
 {
   "name": "jsonspecs",
   "version": "1.0.0",
-  "description": "Composable validation pipelines powered by JSON rules",
+  "description": "Composable validation pipelines powered by JSON rules. Zero dependencies.",
   "type": "commonjs",
   "main": "index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./index.js",
+      "types": "./index.d.ts"
+    }
+  },
   "files": [
     "index.js",
+    "index.d.ts",
     "src/**/*.js",
     "README.md",
-    "OPERATORS.md"
+    "OPERATORS.md",
+    "SPEC.md",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
+  "scripts": {
+    "test": "node --test tests/**/*.test.js",
+    "test:smoke": "node examples/basic/run.js",
+    "prepublishOnly": "npm test"
+  },
   "keywords": [
     "validation",
     "rules-engine",
     "json",
     "declarative",
-    "pipeline"
+    "pipeline",
+    "business-rules"
   ],
+  "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "bugs": {
+    "url": ""
+  },
+  "homepage": "",
   "engines": {
     "node": ">=18"
   },
   "dependencies": {},
-  "devDependencies": {}
+  "devDependencies": {
+    "node": ">=18"
+  }
 }

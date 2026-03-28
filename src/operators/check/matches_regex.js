@@ -1,3 +1,4 @@
+"use strict";
 const { deepGet } = require("../../utils");
 
 function normalizePattern(p) {
@@ -11,7 +12,8 @@ module.exports = function(rule, ctx) {
     if (!got.ok) return { status: "FAIL" };
     const s = String(got.value ?? "");
     const pattern = normalizePattern(rule.value);
-    const re = new RegExp(pattern);
+    const flags = typeof rule.flags === "string" ? rule.flags : "";
+    const re = new RegExp(pattern, flags);
     return { status: re.test(s) ? "OK" : "FAIL" };
   } catch (e) { return { status: "EXCEPTION", error: e }; }
 };

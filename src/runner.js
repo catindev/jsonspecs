@@ -74,7 +74,7 @@ function checkRequiredContext(pipeline, ctxBase, issues, trace, stepId = null) {
   return true;
 }
 
-function runPipeline(compiled, pipelineId, payload) {
+function runPipeline(compiled, pipelineId, payload, options) {
   const { registry, dictionaries, operators, pipelines, conditions } = compiled;
   assert(
     operators && operators.check && operators.predicate,
@@ -89,9 +89,13 @@ function runPipeline(compiled, pipelineId, payload) {
     "runPipeline: compiled.conditions is missing (compile-time steps required)",
   );
 
+  const traceEnabled = !options || options.trace !== false;
   const trace = [];
   const issues = [];
-  const traceFn = makeTrace(trace, `pipeline:${pipelineId}`);
+  // When traceEnabled=false, replace the shared trace array with a throwaway array
+  // so that all internal makeTrace() calls write nowhere observable.
+  const traceTarget = traceEnabled ? trace : [];
+  const traceFn = makeTrace(traceTarget, `pipeline:${pipelineId}`);
 
   // Normalize payload to flat-map before processing.
   // Accepts both nested JSON ({ a: { b: 1 } }) and already-flat payloads ({ "a.b": 1 }).
@@ -142,7 +146,7 @@ function runPipeline(compiled, pipelineId, payload) {
       pipeline.id,
       ctxBase,
       issues,
-      trace,
+      traceTarget,
       `pipeline:${pipelineId}`,
     );
     if (control === "STOP")

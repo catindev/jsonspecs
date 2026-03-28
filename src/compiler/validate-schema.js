@@ -175,6 +175,16 @@ function validateOperatorParams(a, dictionaries) {
   if (a.operator === 'matches_regex') {
     if (typeof a.value !== 'string' || a.value.length === 0) {
       errors.push(`Rule ${where(a)}: matches_regex requires value (regex string)`);
+    } else {
+      // Validate the regex pattern at compile time.
+      // Without this, an invalid pattern causes a silent ABORT at runtime.
+      try {
+        const flags = typeof a.flags === 'string' ? a.flags : '';
+        const pattern = String(a.value).replace(/\\\\/g, '\\');
+        new RegExp(pattern, flags);
+      } catch (e) {
+        errors.push(`Rule ${where(a)}: matches_regex has invalid regex pattern — ${e.message}`);
+      }
     }
   }
   return errors;

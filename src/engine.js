@@ -25,8 +25,8 @@ function createEngine({ operators }) {
       return compile(artifacts, { operators, sources: options.sources });
     },
 
-    runPipeline(compiled, pipelineId, payload) {
-      return runPipeline(compiled, pipelineId, payload);
+    runPipeline(compiled, pipelineId, payload, options) {
+      return runPipeline(compiled, pipelineId, payload, options);
     },
   };
 }
