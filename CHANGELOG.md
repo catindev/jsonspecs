@@ -6,6 +6,22 @@ Format: [Semantic Versioning](https://semver.org/)
 
 ---
 
+## [Unreleased]
+
+---
+
+## [1.0.1] — 2026-03-29
+
+### Fixed
+- `compile()` now deep-clones and deep-freezes source artifacts before building the compiled bundle. Mutating the original artifact objects after compilation no longer changes runtime behavior.
+- `runPipeline()` now applies `strict: true` semantics at the top-level pipeline boundary, not only for nested pipeline steps.
+
+### Tests
+- Added contract tests for top-level strict escalation.
+- Added contract tests proving compiled bundles are detached from source artifacts.
+
+---
+
 ## [1.0.0] — 2024
 
 ### Initial release

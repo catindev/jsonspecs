@@ -109,7 +109,7 @@ export interface OperatorPack {
 // Engine types
 // ---------------------------------------------------------------------------
 
-/** Opaque compiled artifact bundle returned by engine.compile(). */
+/** Opaque compiled artifact bundle returned by engine.compile(). Detached from source artifact objects at compile time. */
 export interface Compiled {
   readonly registry: Map<string, Record<string, unknown>>;
   readonly dictionaries: Map<string, Record<string, unknown>>;

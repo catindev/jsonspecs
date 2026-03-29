@@ -297,3 +297,58 @@ describe("runner — $context fields", () => {
     assert.equal(expired.issues[0].code, "DOC.EXPIRED");
   });
 });
+
+
+describe("runner — top-level strict pipeline", () => {
+  it("escalates ERROR issues to EXCEPTION at pipeline boundary", () => {
+    const r = rule("library.r", "not_empty", "name", "ERROR", "NAME.REQUIRED");
+    const p = pipeline("p", [{ rule: "library.r" }], { strict: true, message: "Top-level strict failed", strictCode: "TOP.STRICT" });
+    const compiled = compile([r, p]);
+    const result = engine.runPipeline(compiled, "p", { name: "" });
+
+    assert.equal(result.status, "EXCEPTION");
+    assert.equal(result.control, "STOP");
+    assert.equal(result.issues.length, 2);
+    assert.equal(result.issues[0].code, "NAME.REQUIRED");
+    assert.equal(result.issues[1].code, "TOP.STRICT");
+    assert.equal(result.issues[1].level, "EXCEPTION");
+    assert.equal(result.issues[1].ruleId, "pipeline:p");
+    assert.equal(result.issues[1].pipelineId, "p");
+    assert.equal(result.issues[1].field, null);
+  });
+
+  it("does not escalate when strict pipeline has no ERROR/EXCEPTION issues", () => {
+    const r = rule("library.r", "not_empty", "name", "WARNING", "NAME.SOFT");
+    const p = pipeline("p", [{ rule: "library.r" }], { strict: true, message: "Top-level strict failed", strictCode: "TOP.STRICT" });
+    const compiled = compile([r, p]);
+    const result = engine.runPipeline(compiled, "p", { name: "" });
+
+    assert.equal(result.status, "OK_WITH_WARNINGS");
+    assert.equal(result.control, "CONTINUE");
+    assert.equal(result.issues.length, 1);
+    assert.equal(result.issues[0].code, "NAME.SOFT");
+  });
+});
+
+describe("compiler — compiled bundle is detached from source artifacts", () => {
+  it("does not observe mutations to source artifacts after compile", () => {
+    const r = rule("library.r", "not_empty", "name", "ERROR", "NAME.REQUIRED");
+    const p = pipeline("p", [{ rule: "library.r" }]);
+    const artifacts = [r, p];
+    const compiled = compile(artifacts);
+
+    artifacts[0].field = "mutated.field";
+    artifacts[0].operator = "equals";
+    artifacts[0].value = "unexpected";
+    artifacts[1].flow.push({ rule: "library.missing" });
+
+    const result = engine.runPipeline(compiled, "p", { name: "Ivan" });
+    assert.equal(result.status, "OK");
+    assert.equal(result.issues.length, 0);
+
+    const storedRule = compiled.registry.get("library.r");
+    assert.equal(storedRule.field, "name");
+    assert.equal(storedRule.operator, "not_empty");
+    assert.ok(Object.isFrozen(storedRule));
+  });
+});
