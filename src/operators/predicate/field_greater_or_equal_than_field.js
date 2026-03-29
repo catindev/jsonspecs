@@ -2,8 +2,8 @@ const { deepGet, toComparable } = require("../../utils");
 
 module.exports = function (rule, ctx) {
   try {
-    const a = deepGet(ctx.payload, rule.field);
-    const b = deepGet(ctx.payload, rule.value_field);
+    const a = ctx.get(rule.field);
+    const b = ctx.get(rule.value_field);
 
     if (!a.ok || !b.ok) return { status: "UNDEFINED" };
 

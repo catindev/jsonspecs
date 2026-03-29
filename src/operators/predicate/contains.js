@@ -1,7 +1,7 @@
 const { deepGet } = require("../../utils");
 module.exports = function(rule, ctx) {
   try {
-    const got = deepGet(ctx.payload, rule.field);
+    const got = ctx.get(rule.field);
     if (!got.ok) return { status: "UNDEFINED" };
     const s = String(got.value ?? "");
     return { status: s.includes(String(rule.value ?? "")) ? "TRUE" : "FALSE" };

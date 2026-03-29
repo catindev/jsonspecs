@@ -320,6 +320,8 @@ function myCheckOperator(rule, ctx) {
   // rule  объект артефакта: { field, value, operator, level, code, ... }
   // ctx   runtime-контекст:
   //           ctx.payload            flat-map всех полей payload
+  //           ctx.get(path)          читает поле из flat payload map
+  //           ctx.has(path)          проверяет наличие поля
   //           ctx.getDictionary(id)  получает словарь по id
   //           ctx.payloadKeys        все ключи, присутствующие в payload
   //           ctx.wildcardCache      Map для кеширования раскрытия wildcard
@@ -341,10 +343,24 @@ function myPredicateOperator(rule, ctx) {
 }
 ```
 
+### Предпочтительный доступ к полям: `ctx.get()` / `ctx.has()`
+
+`ctx.get(path)` — предпочтительный контракт для новых пользовательских операторов. Он возвращает тот же shape, что и `deepGet`: `{ ok, value }`, включая поддержку `$context.*` полей.
+
+```js
+module.exports = function myOperator(rule, ctx) {
+  const got = ctx.get(rule.field);
+  if (!got.ok) return { status: "FAIL" };
+  return { status: got.value ? "OK" : "FAIL", actual: got.value };
+};
+```
+
+`ctx.has(path)` используйте, когда нужна только проверка наличия поля.
+
 ### Использование `deepGet`
 
-`deepGet` стандартный способ прочитать поле из flat payload.
-Импортируйте его из `jsonspecs`:
+`ctx.get(path)` — предпочтительный способ прочитать поле из flat payload. `deepGet` сохраняется для обратной совместимости.
+Импортируйте его из `jsonspecs`, если вам явно нужен этот helper:
 
 ```js
 const { deepGet } = require("jsonspecs");
@@ -369,7 +385,7 @@ deepGet(ctx.payload, "$context.currentDate");
 ### Полный пример: дата не должна быть в прошлом
 
 ```js
-const { createEngine, Operators, deepGet } = require("jsonspecs");
+const { createEngine, Operators } = require("jsonspecs");
 
 const myOperators = {
   check: {
@@ -377,7 +393,7 @@ const myOperators = {
 
     // Проверяет, что дата в поле сегодня или в будущем (>= context date)
     date_not_in_past(rule, ctx) {
-      const got = deepGet(ctx.payload, rule.field);
+      const got = ctx.get(rule.field);
       if (!got.ok || !got.value) return { status: "FAIL", actual: null };
 
       const fieldDate = new Date(got.value);
