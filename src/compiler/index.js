@@ -41,41 +41,42 @@ function compile(artifacts, options = {}) {
   );
 
   const sources = options.sources instanceof Map ? options.sources : null;
+  const detachedArtifacts = artifacts.map((artifact) => deepFreeze(deepCloneJsonLike(artifact)));
 
   setContext(sources);
   try {
     // Фаза 1: реестр — fail-fast, остальные фазы зависят от него
-    const { registry, dictionaries, errors: regErrors } = buildRegistry(artifacts);
+    const { registry, dictionaries, errors: regErrors } = buildRegistry(detachedArtifacts);
     throwIfErrors(regErrors);
 
     // Фаза 2: схема артефактов — собираем все ошибки по всем артефактам
-    const schemaErrors = validateSchema(artifacts, dictionaries, operators);
+    const schemaErrors = validateSchema(detachedArtifacts, dictionaries, operators);
     throwIfErrors(schemaErrors);
 
     // Фаза 3: уникальность кодов
-    const codeErrors = validateCodeUniqueness(artifacts);
+    const codeErrors = validateCodeUniqueness(detachedArtifacts);
     throwIfErrors(codeErrors);
 
     // Фаза 4: ссылки и видимость
-    const refErrors = validateRefs(artifacts, registry);
+    const refErrors = validateRefs(detachedArtifacts, registry);
     throwIfErrors(refErrors);
 
     // Фазы 5–6: компиляция шагов (бросают assert — структура уже проверена)
-    const compiledConditions = buildConditions(artifacts);
-    const compiledPipelines  = buildPipelines(artifacts);
+    const compiledConditions = buildConditions(detachedArtifacts);
+    const compiledPipelines  = buildPipelines(detachedArtifacts);
 
     // Фаза 7: DAG (нет циклов)
     const dagErrors = validatePipelineDAG(registry, compiledPipelines, compiledConditions);
     throwIfErrors(dagErrors);
 
-    return {
+    return Object.freeze({
       registry,
       dictionaries,
       sources,
       operators,
       pipelines:  compiledPipelines,
       conditions: compiledConditions,
-    };
+    });
   } finally {
     clearContext();
   }
@@ -116,6 +117,30 @@ function buildRegistry(artifacts) {
   }
 
   return { registry, dictionaries, errors };
+}
+
+function deepCloneJsonLike(value) {
+  if (Array.isArray(value)) return value.map((item) => deepCloneJsonLike(item));
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const [key, inner] of Object.entries(value)) {
+      out[key] = deepCloneJsonLike(inner);
+    }
+    return out;
+  }
+  return value;
+}
+
+function deepFreeze(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+
+  Object.freeze(value);
+  if (Array.isArray(value)) {
+    for (const item of value) deepFreeze(item);
+    return value;
+  }
+  for (const inner of Object.values(value)) deepFreeze(inner);
+  return value;
 }
 
 module.exports = { compile };

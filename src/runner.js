@@ -42,6 +42,34 @@ function resolveRuleFields(rule, payloadKeys, traceFn) {
 }
 
 
+function applyStrictBoundary(pipeline, issues, issuesStart, stepId, traceFn) {
+  if (!pipeline || pipeline.strict !== true) return false;
+
+  const localIssues = issues.slice(issuesStart);
+  const hasErrors = localIssues.some(
+    (i) => i && (i.level === "ERROR" || i.level === "EXCEPTION"),
+  );
+
+  if (!hasErrors) return false;
+
+  const code = pipeline.strictCode || "STRICT_PIPELINE_FAILED";
+  issues.push({
+    kind: "ISSUE",
+    level: "EXCEPTION",
+    code,
+    message: pipeline.message,
+    field: null,
+    ruleId: `pipeline:${pipeline.id}`,
+    pipelineId: pipeline.id,
+    stepId: stepId || undefined,
+  });
+  traceFn("STOP by strict pipeline boundary", {
+    pipelineId: pipeline.id,
+    code,
+  });
+  return true;
+}
+
 function checkRequiredContext(pipeline, ctxBase, issues, trace, stepId = null) {
   const required = Array.isArray(pipeline && pipeline.required_context)
     ? pipeline.required_context
@@ -149,6 +177,11 @@ function runPipeline(compiled, pipelineId, payload, options) {
       traceTarget,
       `pipeline:${pipelineId}`,
     );
+
+    if (applyStrictBoundary(pipelineArtifact, issues, 0, null, traceFn)) {
+      return { status: "EXCEPTION", control: "STOP", issues, trace };
+    }
+
     if (control === "STOP")
       traceFn("pipeline stopped by EXCEPTION", { pipelineId });
 
@@ -306,28 +339,8 @@ function execSteps(
       );
 
       // strict pipelines: if they produced at least one ERROR/EXCEPTION issue, raise a boundary EXCEPTION
-      if (p.strict === true) {
-        const localIssues = issues.slice(issuesStart);
-        const hasErrors = localIssues.some(
-          (i) => i && (i.level === "ERROR" || i.level === "EXCEPTION"),
-        );
-        if (hasErrors) {
-          issues.push({
-            kind: "ISSUE",
-            level: "EXCEPTION",
-            code: p.strictCode || "STRICT_PIPELINE_FAILED",
-            message: p.message,
-            field: null,
-            ruleId: `pipeline:${p.id}`,
-            pipelineId: p.id,
-            stepId,
-          });
-          t("STOP by strict pipeline boundary", {
-            pipelineId: p.id,
-            code: p.strictCode || "STRICT_PIPELINE_FAILED",
-          });
-          return "STOP";
-        }
+      if (applyStrictBoundary(p, issues, issuesStart, stepId, t)) {
+        return "STOP";
       }
 
       if (control === "STOP") return "STOP";
