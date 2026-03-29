@@ -1,376 +1,585 @@
-# JSONSpecs
+# JSONSpecs: cпецификация форматов артефактов
 
-Декларативный движок валидационных правил для Node.js.
+> Поведение компилятора и рантайма соответствует этому документу.
 
-Правила описываются в JSON-файлах. Движок компилирует их, запускает на любом payload и возвращает структурированный результат с уровнями `ERROR`, `WARNING` и `EXCEPTION`, полным списком issue и execution trace. Без внешних зависимостей.
+## Содержание
+
+1. [Общие правила для всех артефактов](#1-общие-правила-для-всех-артефактов)
+2. [Идентификаторы и видимость](#2-идентификаторы-и-видимость)
+3. [Разрешение ссылок](#3-разрешение-ссылок)
+4. [Артефакт: rule](#4-артефакт-rule)
+   - 4.1 [Общая схема](#41-общая-схема)
+   - 4.2 [check-правило](#42-check-правило)
+   - 4.3 [predicate-правило](#43-predicate-правило)
+   - 4.4 [Операторы](#44-операторы)
+   - 4.5 [Wildcard и агрегация](#45-wildcard-и-агрегация)
+5. [Артефакт: condition](#5-артефакт-condition)
+6. [Артефакт: pipeline](#6-артефакт-pipeline)
+7. [Артефакт: dictionary](#7-артефакт-dictionary)
+8. [Шаги (steps / flow)](#8-шаги-steps--flow)
+9. [Семантика полей payload](#9-семантика-полей-payload)
+10. [Поведение компилятора](#10-поведение-компилятора)
+11. [Поведение рантайма](#11-поведение-рантайма)
+
+## 1. Общие правила для всех артефактов
+
+Каждый артефакт это отдельный объект (как правило, JSON-файл). Все поля, перечисленные ниже как обязательные, проверяются компилятором на фазе 1 (`buildRegistry`) или фазе 2 (`validateSchema`). Отсутствие обязательного поля является ошибкой компиляции.
+
+### Поля, обязательные для каждого артефакта любого типа
+
+| Поле          | Тип               | Обяз. | Описание                                                          |
+| ------------- | ----------------- | ----- | ----------------------------------------------------------------- |
+| `id`          | string, non-empty | да    | Уникальный идентификатор артефакта. Задаётся явно (см. раздел 2). |
+| `type`        | string            | да    | Тип артефакта: `rule`, `condition`, `pipeline`, `dictionary`.     |
+| `description` | string            | да    | Человекочитаемое описание. Не может быть пустой строкой.          |
+
+> Дублирование `id` вызовет ошибку компиляции. Два артефакта не могут иметь одинаковый `id` в одном наборе правил.
+
+## 2. Идентификаторы и видимость
+
+### Требования к `id`
+
+Поле `id` должно быть явно задано в каждом артефакте. Именование `id` остаётся на усмотрение приложения. На момент создания этой спеки соглашение при загрузке из файловой системы формировать `id` из пути файла относительно корневой директории правил, заменяя `/` на `.` и убирая расширение `.json`:
 
 ```
-npm install jsonspecs
+library/common/email_format.json      →  "library.common.email_format"
+pipelines/checkout/rule_amount.json   →  "checkout.rule_amount"
+dictionaries/currencies.json          →  "currencies"
 ```
 
-## Как это работает
+Это конвенция загрузчика на стороне приложения, не требование библиотеки.
 
-Правила хранятся как отдельные JSON-файлы. Pipeline собирает их в сценарий. Движок компилирует их один раз, после чего может запускать на любом payload.
+### Правила видимости
 
-**Шаг 1 написать атомарные правила** (один файл на одно правило):
+Компилятор на фазе 4 (`validateRefs`) применяет следующие правила видимости:
 
-`rules/library/person/first_name_required.json`
+| Артефакт               | Откуда виден                                                       |
+| ---------------------- | ------------------------------------------------------------------ |
+| `library.*`            | из любого места: pipeline, condition, другой library               |
+| `{pipelineId}.*`       | только из pipeline с тем же `{pipelineId}` и из его condition      |
+| pipeline (полный `id`) | любой pipeline может вызвать любой другой pipeline по полному `id` |
+| `dictionaries/*`       | глобально из любого правила                                        |
+
+Вложенные pipeline не наследуют видимость родителя: `registration.base_validate.rule_username` не виден из `registration` напрямую только через вложенный pipeline `registration.base_validate`.
+
+## 3. Разрешение ссылок
+
+Когда в шаге pipeline или condition указывается ссылка на правило, условие или вложенный pipeline, компилятор разрешает её по следующему алгоритму:
+
+| Форма ссылки                                 | Поведение                                               | Пример                                     |
+| -------------------------------------------- | ------------------------------------------------------- | ------------------------------------------ |
+| `library.*` (начинается с `library.`)        | абсолютная ссылка, берётся как есть                     | `"library.common.email_format"`            |
+| содержит `.` (но не начинается с `library.`) | абсолютная ссылка, берётся как есть                     | `"internal.customer.blocks.identity"`      |
+| не содержит `.`                              | scoped ref: разворачивается в `{scopePipelineId}.{ref}` | `"rule_amount"` → `"checkout.rule_amount"` |
+
+Scope для pipeline это его собственный `id`. Scope для condition — `id` пайплайна, из которого выведен scope (префикс до последней точки в `id` condition).
+
+## 4. Артефакт: rule
+
+### 4.1 Общая схема
+
+| Поле          | Тип    | Обязательное                  | Допустимые значения        | Описание                                                                                                                            |
+| ------------- | ------ | ----------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | string | да                            | уникальный                 |                                                                                                                                     |
+| `type`        | string | да                            | `"rule"`                   |                                                                                                                                     |
+| `description` | string | да                            | непустая                   |                                                                                                                                     |
+| `role`        | string | да                            | `"check"` \| `"predicate"` | Определяет тип правила. Влияет на набор обязательных полей и доступных операторов.                                                  |
+| `operator`    | string | да                            | см. раздел 4.4             | Название оператора из зарегистрированного набора.                                                                                   |
+| `field`       | string | да для большинства операторов | dot-notation path          | Поле из payload, к которому применяется оператор. Может содержать `[*]` (см. раздел 4.5). Поддерживает `$context.*` (см. раздел 9). |
+| `meta`        | object | опционально                   | любой объект               | Произвольные метаданные. Передаются в trace и в issue. Не влияют на логику выполнения.                                              |
+| `aggregate`   | object | опционально                   | см. раздел 4.5             | Настройки агрегации для wildcard-полей.                                                                                             |
+
+### 4.2 check-правило
+
+Применяется при `role: "check"`. Проверяет условие и при невыполнении создаёт `issue` в результате выполнения.
+
+**Дополнительные обязательные поля:**
+
+| Поле      | Тип    | Обязательность | Допустимые значения                       | Описание                                                                                                                             |
+| --------- | ------ | -------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `level`   | string | обязательно    | `"WARNING"` \| `"ERROR"` \| `"EXCEPTION"` | Уровень эскалации при нарушении.                                                                                                     |
+| `code`    | string | обязательно    | непустая, уникальная в наборе             | Машиночитаемый код ошибки. Уникальность проверяется компилятором — два check-правила с одинаковым `code` вызывают ошибку компиляции. |
+| `message` | string | обязательно    | непустая                                  | Человекочитаемое сообщение об ошибке.                                                                                                |
+
+**Пример:**
 
 ```json
 {
-  "id": "library.person.first_name_required",
+  "id": "library.customer.country_required",
   "type": "rule",
-  "description": "Имя должно быть заполнено",
+  "description": "Страна клиента обязательна",
   "role": "check",
   "operator": "not_empty",
-  "level": "ERROR",
-  "code": "PERSON.FIRST_NAME.REQUIRED",
-  "message": "Необходимо указать имя",
-  "field": "person.firstName"
-}
-```
-
-`rules/library/person/email_format.json`
-
-```json
-{
-  "id": "library.person.email_format",
-  "type": "rule",
-  "description": "Email должен содержать @",
-  "role": "check",
-  "operator": "contains",
-  "level": "WARNING",
-  "code": "PERSON.EMAIL.FORMAT",
-  "message": "Адрес электронной почты выглядит некорректным",
-  "field": "person.email",
-  "value": "@"
-}
-```
-
-`rules/library/person/doc_not_expired.json`
-
-```json
-{
-  "id": "library.person.doc_not_expired",
-  "type": "rule",
-  "description": "Документ не должен быть просрочен",
-  "role": "check",
-  "operator": "field_greater_or_equal_than_field",
+  "field": "customer.countryCode",
   "level": "EXCEPTION",
-  "code": "PERSON.DOC.EXPIRED",
-  "message": "Срок действия документа истёк",
-  "field": "person.document.expireDate",
-  "value_field": "$context.currentDate"
+  "code": "CUSTOMER.COUNTRY.REQUIRED",
+  "message": "Укажите страну клиента"
 }
 ```
 
-**Шаг 2 собрать правила в pipeline:**
+### 4.3 predicate-правило
 
-`rules/pipelines/registration/pipeline.json`
+Применяется при `role: "predicate"`. Возвращает `TRUE` или `FALSE` и используется в `when`-выражении артефактов condition. Не создаёт `issue`.
+
+**Запрещённые поля для `role: "predicate"`:** `level`, `code`, `message`. Их наличие вызовет ошибку компиляции.
+
+**Пример:**
 
 ```json
 {
-  "id": "registration.pipeline",
-  "type": "pipeline",
-  "description": "Валидация регистрации физлица",
-  "entrypoint": true,
-  "strict": false,
-  "required_context": ["currentDate"],
-  "flow": [
-    { "rule": "library.person.first_name_required" },
-    { "rule": "library.person.email_format" },
-    { "rule": "library.person.doc_not_expired" }
-  ]
+  "id": "library.order.pred_is_international",
+  "type": "rule",
+  "description": "Заказ отмечен как международный",
+  "role": "predicate",
+  "operator": "equals",
+  "field": "order.flags.isInternational",
+  "value": true
 }
 ```
 
-**Шаг 3 скомпилировать и запустить:**
+### 4.4 Операторы
 
-```js
-const { createEngine, Operators } = require("jsonspecs");
+#### check-операторы
 
-const artifacts = [
-  require("./rules/library/person/first_name_required.json"),
-  require("./rules/library/person/email_format.json"),
-  require("./rules/library/person/doc_not_expired.json"),
-  require("./rules/pipelines/registration/pipeline.json"),
-];
+| Оператор                            | Дополнительные поля правила                  | Семантика                                                                       | Поведение при отсутствии поля                    |
+| ----------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `not_empty`                         | —                                            | поле присутствует и не равно `null`, `""`, `undefined`                          | FAIL                                             |
+| `is_empty`                          | —                                            | поле отсутствует, равно `null` или `""`                                         | OK (поле отсутствует — считается пустым)         |
+| `equals`                            | `value: any`                                 | `field === value` (строгое равенство)                                           | FAIL                                             |
+| `not_equals`                        | `value: any`                                 | `field !== value`                                                               | FAIL                                             |
+| `contains`                          | `value: string`                              | строковое значение поля содержит `value` как подстроку                          | FAIL                                             |
+| `matches_regex`                     | `value: string` (regex), `flags?: string`    | строковое значение поля соответствует регулярному выражению `value`             | FAIL                                             |
+| `greater_than`                      | `value: number \| "YYYY-MM-DD"`              | поле > value; сравнение числовое или датовое (тип определяется автоматически)   | FAIL                                             |
+| `less_than`                         | `value: number \| "YYYY-MM-DD"`              | поле < value                                                                    | FAIL                                             |
+| `length_equals`                     | `value: number`                              | `String(field).length === value`                                                | FAIL                                             |
+| `length_max`                        | `value: number`                              | `String(field).length <= value`                                                 | FAIL                                             |
+| `field_equals_field`                | `value_field: string`                        | `field === value_field` (оба должны присутствовать)                             | FAIL если одно из полей отсутствует              |
+| `field_not_equals_field`            | `value_field: string`                        | `field !== value_field`                                                         | FAIL если одно из полей отсутствует              |
+| `field_greater_than_field`          | `value_field: string`                        | `field > value_field`; типы должны совпадать (оба числа или обе даты)           | FAIL если типы не совпадают или поле отсутствует |
+| `field_less_than_field`             | `value_field: string`                        | `field < value_field`                                                           | FAIL если типы не совпадают или поле отсутствует |
+| `field_greater_or_equal_than_field` | `value_field: string`                        | `field >= value_field`                                                          | FAIL если типы не совпадают или поле отсутствует |
+| `field_less_or_equal_than_field`    | `value_field: string`                        | `field <= value_field`                                                          | FAIL если типы не совпадают или поле отсутствует |
+| `in_dictionary`                     | `dictionary: { type: "static", id: string }` | значение поля входит в список `entries` словаря                                 | FAIL                                             |
+| `any_filled`                        | `fields: string[]`                           | хотя бы одно поле из списка непустое. `field` в этом операторе не используется. | FAIL если ни одно не заполнено                   |
 
-const engine = createEngine({ operators: Operators });
-const compiled = engine.compile(artifacts);
+> **`matches_regex` поле `flags`:** необязательный строковый параметр флагов регулярного выражения (`"i"`, `"m"`, `"s"` и т.д.). Если не задан, флаги не применяются. Компилятор проверяет валидность паттерна и флагов на фазе компиляции — невалидный паттерн является ошибкой компиляции.
 
-const result = engine.runPipeline(compiled, "registration.pipeline", {
-  person: {
-    firstName: "Ivan",
-    email: "ivan@example.com",
-    document: { expireDate: "2028-01-01" },
-  },
-  __context: { currentDate: "2026-03-27" },
-});
+> **`matches_regex` экранирование:** обратные слэши в JSON-строке двойные (`\\d`); движок нормализует их в одинарные (`\d`) перед передачей в `new RegExp()`.
 
-// { status: "OK", control: "CONTINUE", issues: [] }
+> **`any_filled`** особый оператор: принимает `fields[]` вместо `field`. Поле `field` при использовании `any_filled` может быть опущено. Компилятор требует непустой `fields[]`.
+
+> **`in_dictionary`** `dictionary.type`: единственное поддерживаемое значение `"static"`. Другие значения вызывают ошибку рантайма.
+
+> **`greater_than`, `less_than`, `field_*_field`:** сравниваются только числа и даты формата `YYYY-MM-DD`. Если тип значения не определяется — FAIL.
+
+#### predicate-операторы
+
+Подмножество check-операторов. Недоступны: `any_filled`, `length_equals`, `length_max`.
+
+Доступны: `not_empty`, `is_empty`, `equals`, `not_equals`, `contains`, `matches_regex`, `greater_than`, `less_than`, `field_equals_field`, `field_not_equals_field`, `field_greater_or_equal_than_field`, `field_less_or_equal_than_field`, `in_dictionary`.
+
+Предикатные операторы возвращают `TRUE`, `FALSE`, `UNDEFINED`. Значение `UNDEFINED` рантаймом трактуется как `FALSE`.
+
+### 4.5 Wildcard и агрегация
+
+Если `field` содержит `[*]`, правило применяется ко всем совпавшим ключам payload.
+
+**Синтаксис:** любое количество `[*]` в одном `field`:
+
+```
+"accounts[*].balance"
+"accounts[*].transactions[*].amount"
 ```
 
-Движок не привязан к конкретному загрузчику: артефакты могут поступать из файловой системы, snapshot-файла, базы данных или быть встроенными объектами прямо в тестах. См. [Загрузка артефактов](#загрузка-артефактов).
+**Поле `aggregate`:**
 
-## API
-
-### `createEngine({ operators })`
-
-Создаёт экземпляр движка, привязанный к набору операторов.
-
-```js
-const { createEngine, Operators } = require("jsonspecs");
-const engine = createEngine({ operators: Operators });
+```json
+"aggregate": {
+  "mode": "ALL",
+  "onEmpty": "PASS",
+  "summaryIssue": true,
+  "op": ">=",
+  "value": 2
+}
 ```
 
-`Operators` встроенный набор, покрывающий все стандартные checks и predicates. Вы можете расширить его собственными операторами, см. [Пользовательские операторы](#пользовательские-операторы).
+| Подполе        | Тип     | Применимость                | Описание                                                                                |
+| -------------- | ------- | --------------------------- | --------------------------------------------------------------------------------------- |
+| `mode`         | string  | опционально                 | Режим агрегации (см. таблицы ниже).                                                     |
+| `onEmpty`      | string  | опционально                 | Поведение если wildcard не нашёл ни одного поля (см. ниже).                             |
+| `summaryIssue` | boolean | только `check`, режим `ALL` | `true` — вместо отдельного issue на каждый провал создать один суммарный.               |
+| `op`           | string  | только режим `COUNT`        | Оператор сравнения: `==`, `!=`, `>`, `>=`, `<`, `<=`. По умолчанию `>=`.                |
+| `value`        | number  | только режим `COUNT`        | Целевое число для сравнения с количеством прошедших элементов. Обязательно при `COUNT`. |
 
-### `engine.compile(artifacts, options?)`
+**Режимы агрегации для `role: "check"`:**
 
-Компилирует массив артефактов в оптимизированную runtime-структуру. Если какой-либо артефакт некорректен, выбрасывает `CompilationError` с полным списком ошибок.
+| mode    | По умолчанию | Семантика                                                                                                       |
+| ------- | ------------ | --------------------------------------------------------------------------------------------------------------- |
+| `EACH`  | да           | issue создаётся для каждого упавшего элемента отдельно                                                          |
+| `ALL`   | нет          | все элементы должны пройти; без `summaryIssue` — отдельный issue на каждый, с `summaryIssue: true` — один общий |
+| `COUNT` | нет          | проверяет, что количество прошедших элементов удовлетворяет условию `op value`                                  |
+| `MIN`   | нет          | извлекает минимальное значение и применяет оператор к нему                                                      |
+| `MAX`   | нет          | извлекает максимальное значение и применяет оператор к нему                                                     |
 
-```js
-const compiled = engine.compile(artifacts, { sources });
+**Режимы агрегации для `role: "predicate"`:**
+
+| mode    | По умолчанию | Семантика                                                        |
+| ------- | ------------ | ---------------------------------------------------------------- |
+| `ANY`   | да           | `TRUE` если хотя бы один элемент вернул `TRUE`                   |
+| `ALL`   | нет          | `TRUE` если все элементы вернули `TRUE`                          |
+| `COUNT` | нет          | `TRUE` если количество `TRUE`-элементов удовлетворяет `op value` |
+
+> `MIN` и `MAX` для `role: "predicate"` не поддерживаются — ошибка компиляции.
+
+**Поведение `onEmpty` — wildcard не нашёл ни одного поля:**
+
+| Значение    | check (умолчание: `PASS`)                                    | predicate (умолчание: `UNDEFINED`)               |
+| ----------- | ------------------------------------------------------------ | ------------------------------------------------ |
+| `PASS`      | правило считается пройденным, issue не создаётся             | —                                                |
+| `FAIL`      | правило считается упавшим, создаётся issue                   | —                                                |
+| `TRUE`      | —                                                            | predicate возвращает `TRUE`                      |
+| `FALSE`     | —                                                            | predicate возвращает `FALSE`                     |
+| `UNDEFINED` | трактуется как `PASS`                                        | predicate возвращает `FALSE` (UNDEFINED → FALSE) |
+| `ERROR`     | рантайм выбрасывает исключение, pipeline завершается `ABORT` | то же                                            |
+
+## 5. Артефакт: condition
+
+Выполняет список шагов (`steps`) только если `when`-выражение истинно.
+
+### Схема
+
+| Поле          | Тип              | Обязательность | Допустимые значения   | Описание                                                                         |
+| ------------- | ---------------- | -------------- | --------------------- | -------------------------------------------------------------------------------- |
+| `id`          | string           | обязательно    | уникальный            |                                                                                  |
+| `type`        | string           | обязательно    | `"condition"`         |                                                                                  |
+| `description` | string           | обязательно    | непустая              |                                                                                  |
+| `when`        | string \| object | обязательно    | см. ниже              | Условие активации.                                                               |
+| `steps`       | array            | обязательно    | непустой массив шагов | Шаги, выполняемые при истинном `when`. Каждый шаг — объект ровно с одним ключом. |
+
+### Поле `when`
+
+Три базовые формы:
+
+```json
+"when": "pred_is_international"
 ```
 
-Проверки на этапе компиляции: валидация схемы, целостность ссылок, обнаружение циклов в DAG, наличие операторов и уникальность `code` среди всех правил. `sources` необязательный `Map<artifactId, sourceFile>`, используемый для показа путей к файлам в сообщениях об ошибках; автоматически заполняется `loadArtifactsFromDir`.
-
-### `engine.runPipeline(compiled, pipelineId, payload)`
-
-Запускает именованный pipeline на указанном payload.
-
-```js
-const result = engine.runPipeline(compiled, "registration.pipeline", {
-  person: { firstName: "Иван" },
-  __context: { currentDate: "2026-03-27" },
-});
+```json
+"when": { "all": ["pred_a", "pred_b"] }
 ```
 
-Payload может быть как вложенным JSON-объектом, так и заранее преобразованным flat-map в dot-notation поддерживаются оба варианта. Runtime-контекст передаётся под зарезервированным ключом `__context`. Правила получают доступ к нему через `$context.fieldName`.
+```json
+"when": { "any": ["pred_a", "pred_b"] }
+```
 
-**Структура результата:**
+| Форма              | Семантика                                                  |
+| ------------------ | ---------------------------------------------------------- |
+| строка             | одиночный predicate; condition активируется если он `TRUE` |
+| `{ "all": [...] }` | все predicates должны вернуть `TRUE`                       |
+| `{ "any": [...] }` | хотя бы один predicate должен вернуть `TRUE`               |
 
-```js
+Элементы `all`/`any` могут быть как строками-ссылками, так и вложенными объектами `{ "all": [...] }` / `{ "any": [...] }` — поддерживается произвольная глубина вложенности (см. раздел о вложенных `when`).
+
+Каждая конечная ссылка разрешается по правилам раздела 3 и должна указывать на правило с `role: "predicate"`. Ссылка на `role: "check"` вызовет ошибку компиляции.
+
+### Вывод scope из id
+
+Компилятор определяет `scopePipelineId` condition как префикс `id` до последней точки:
+
+```
+"library.order.cond_international_block"  →  scope: "library.order"
+"checkout.cond_amount_check"              →  scope: "checkout"
+```
+
+Если из `id` невозможно вывести scope (нет точки) — ошибка компиляции.
+
+### Вложенные when-выражения
+
+`condition.when` поддерживает рекурсивные комбинации `all`/`any`:
+
+```json
 {
-  status: "OK" | "OK_WITH_WARNINGS" | "ERROR" | "EXCEPTION",
-  control: "CONTINUE" | "STOP",
-  issues: [
-    {
-      kind: "ISSUE",
-      level: "ERROR" | "WARNING" | "EXCEPTION",
-      code: "PERSON.FIRST_NAME.REQUIRED",
-      message: "Необходимо указать имя",
-      field: "person.firstName",
-      ruleId: "library.person.name_required",
-      actual: "",       // значение, на котором произошёл провал
-      expected: ...      // ожидаемое значение правила или ссылка на словарь, если применимо
-    }
-  ]
-}
-```
-
-### `deepGet(payload, field)`
-
-Вспомогательная функция, экспортируемая для использования внутри пользовательских операторов. Ищет поле по dot-notation path в flat payload map, с поддержкой полей вида `$context.*`.
-
-```js
-const { deepGet } = require("jsonspecs");
-
-// Возвращает { ok: true, value: "Иван" }
-deepGet(ctx.payload, "person.firstName");
-
-// Возвращает { ok: true, value: "2026-03-27" }
-deepGet(ctx.payload, "$context.currentDate");
-
-// Возвращает { ok: false, value: undefined }  поле отсутствует
-deepGet(ctx.payload, "person.unknownField");
-```
-
-### `CompilationError`
-
-Выбрасывается из `engine.compile()`, если артефакты некорректны. Содержит полный список всех найденных ошибок, а не только первую.
-
-```js
-const { CompilationError } = require("jsonspecs");
-
-try {
-  engine.compile(artifacts);
-} catch (err) {
-  if (err instanceof CompilationError) {
-    console.error("Compilation failed:");
-    err.errors.forEach((msg, i) => console.error(`  ${i + 1}. ${msg}`));
+  "when": {
+    "all": [
+      "library.common.pred_phone_missing",
+      {
+        "any": [
+          "library.order.pred_is_international",
+          "library.tax.pred_foreign_resident"
+        ]
+      }
+    ]
   }
 }
 ```
 
-## Загрузка артефактов
+Это означает: первое условие истинно **и одновременно** истинно хотя бы одно из вложенных условий.
 
-Движок не привязан к конкретному загрузчику. Вы сами решаете, как загрузить артефакты в память.
-
-**Из файловой системы** (разработка: сканирование директории с `.json`-файлами):
-
-```js
-// loader-fs является частью вашего серверного проекта, а не этого пакета
-const { loadArtifactsFromDir } = require("./lib/loader-fs");
-const { artifacts, sources } = loadArtifactsFromDir("./rules");
-const compiled = engine.compile(artifacts, { sources });
-```
-
-**Из snapshot** (production: один заранее собранный JSON-файл):
-
-```js
-const snapshot = JSON.parse(fs.readFileSync("snapshot.json", "utf8"));
-const compiled = engine.compile(snapshot.artifacts);
-```
-
-**Inline** (тесты: артефакты задаются как обычные JS-объекты):
-
-```js
-const artifacts = [
-  {
-    id: "library.t.name",
-    type: "rule",
-    description: "Имя должно быть заполнено",
-    role: "check",
-    operator: "not_empty",
-    level: "ERROR",
-    code: "NAME.REQUIRED",
-    message: "Необходимо указать имя",
-    field: "person.name",
-  },
-  {
-    id: "test.pipeline",
-    type: "pipeline",
-    description: "Тест",
-    entrypoint: true,
-    strict: false,
-    flow: [{ rule: "library.t.name" }],
-  },
-];
-
-const compiled = engine.compile(artifacts);
-const result = engine.runPipeline(compiled, "test.pipeline", {
-  person: { name: "" },
-});
-// result.status === "ERROR"
-// result.issues[0].code === "NAME.REQUIRED"
-```
-
-## Типы артефактов
-
-| Type         | Назначение                                                                                  |
-| ------------ | ------------------------------------------------------------------------------------------- |
-| `rule`       | Атомарная проверка или предикат: один оператор, одно поле, один результат                   |
-| `condition`  | Условный блок: predicate-guard в `when` + `steps`, которые выполняются при истинном условии |
-| `pipeline`   | Упорядоченная последовательность шагов: правила, conditions, подпайплайны                   |
-| `dictionary` | Именованный список допустимых значений, используемый оператором `in_dictionary`             |
-
-## Правила области видимости
-
-Идентификаторы артефактов управляют видимостью между pipeline.
-
-**Префикс `library.*`** глобальная видимость из любого pipeline или condition:
-
-```
-library.person.email_format    ← можно использовать в любом сценарии
-library.payment.card_required  ← можно использовать в любом сценарии
-```
-
-**Pipeline-local** видимость внутри сценария, если идентификаторы разделяют общий dotted prefix:
-
-```
-Pipeline:   internal.checkout.blocks.payment
-Visible:    internal.checkout.blocks.payment.card_expiry_check
-```
-
-Компилятор валидирует все ссылки и на этапе компиляции сообщает о каждой неразрешимой.
-
-## Уровни результата
-
-| Level       | Значение                                      | Поведение pipeline                           |
-| ----------- | --------------------------------------------- | -------------------------------------------- |
-| `ERROR`     | Ошибка валидации                              | Накапливается, **не** останавливает pipeline |
-| `WARNING`   | Мягкая проверка, подсказка по качеству данных | Накапливается, **не** останавливает pipeline |
-| `EXCEPTION` | Жёсткая блокировка, продолжать нельзя         | Немедленно **останавливает** pipeline        |
-
-| `status`             | Значение                                                                         |
-| -------------------- | -------------------------------------------------------------------------------- |
-| `"OK"`               | Вообще нет issue                                                                 |
-| `"OK_WITH_WARNINGS"` | Проверка пройдена, но есть мягкие issue уровня `WARNING`, которые стоит показать |
-| `"ERROR"`            | Есть одна или более issue уровня `ERROR`                                         |
-| `"EXCEPTION"`        | Pipeline был остановлен правилом уровня `EXCEPTION`                              |
-
-## Пользовательские операторы
-
-См. полный справочник в [OPERATORS.md](./OPERATORS.md).
-
-Короткий пример добавления собственного check-оператора:
-
-```js
-const { createEngine, Operators, deepGet } = require("jsonspecs");
-
-const myOperators = {
-  check: {
-    ...Operators.check,
-
-    // Пользовательская проверка: значение должно соответствовать одному из допустимых паттернов, а не только точной строке
-    matches_any_pattern(rule, ctx) {
-      const got = deepGet(ctx.payload, rule.field);
-      if (!got.ok || got.value == null) return { status: "FAIL" };
-      const patterns = Array.isArray(rule.value) ? rule.value : [rule.value];
-      const matched = patterns.some((p) =>
-        new RegExp(p).test(String(got.value)),
-      );
-      return { status: matched ? "OK" : "FAIL", actual: got.value };
-    },
-  },
-  predicate: {
-    ...Operators.predicate,
-  },
-};
-
-const engine = createEngine({ operators: myOperators });
-```
-
-Затем оператор используется в артефакте правила:
+### Пример
 
 ```json
 {
-  "id": "library.address.postal_code",
-  "type": "rule",
-  "description": "Почтовый индекс должен соответствовать формату РФ или международному формату",
-  "role": "check",
-  "operator": "matches_any_pattern",
-  "level": "ERROR",
-  "code": "ADDR.POSTAL.FORMAT",
-  "message": "Некорректный формат почтового индекса",
-  "field": "address.postalCode",
-  "value": ["^\\d{6}$", "^[A-Z]{1,2}\\d{1,2}[A-Z]?\\s?\\d[A-Z]{2}$"]
+  "id": "library.order.cond_international_block",
+  "type": "condition",
+  "description": "Если заказ международный, проверяем блок tax",
+  "when": {
+    "any": [
+      "library.order.pred_is_international",
+      "library.tax.pred_foreign_resident"
+    ]
+  },
+  "steps": [
+    { "rule": "library.tax.foreign_country_required" },
+    { "rule": "library.tax.foreign_country_format" },
+    { "condition": "library.tax.cond_tin_if_present" }
+  ]
 }
 ```
 
-## Встроенные операторы
+## 6. Артефакт: pipeline
 
-Полный справочник с примерами: [OPERATORS.md](./OPERATORS.md).
+Описывает последовательность шагов — основной сценарий выполнения проверок входящего payload.
 
-| Operator                            | Type              | Description                                    |
-| ----------------------------------- | ----------------- | ---------------------------------------------- |
-| `not_empty`                         | check + predicate | Поле присутствует и не пустое                  |
-| `is_empty`                          | check + predicate | Поле отсутствует или пустое                    |
-| `equals`                            | check + predicate | Значение поля равно `value`                    |
-| `not_equals`                        | check + predicate | Значение поля не равно `value`                 |
-| `matches_regex`                     | check + predicate | Значение поля соответствует regex из `value`   |
-| `length_equals`                     | check             | Длина строки или массива равна `value`         |
-| `length_max`                        | check             | Длина строки или массива ≤ `value`             |
-| `contains`                          | check + predicate | Строка содержит подстроку `value`              |
-| `greater_than`                      | check + predicate | Значение поля > `value`                        |
-| `less_than`                         | check + predicate | Значение поля < `value`                        |
-| `in_dictionary`                     | check + predicate | Значение присутствует в именованном словаре    |
-| `any_filled`                        | check             | Хотя бы одно поле из списка `fields` не пустое |
-| `field_equals_field`                | check + predicate | `field` == `value_field`                       |
-| `field_not_equals_field`            | check + predicate | `field` != `value_field`                       |
-| `field_less_than_field`             | check + predicate | `field` < `value_field`                        |
-| `field_greater_than_field`          | check + predicate | `field` > `value_field`                        |
-| `field_less_or_equal_than_field`    | check + predicate | `field` ≤ `value_field`                        |
-| `field_greater_or_equal_than_field` | check + predicate | `field` ≥ `value_field`                        |
+### Схема
+
+| Поле               | Тип      | Обязательность                         | Допустимые значения   | Описание                                                                  |
+| ------------------ | -------- | -------------------------------------- | --------------------- | ------------------------------------------------------------------------- |
+| `id`               | string   | обязательно                            | уникальный            |                                                                           |
+| `type`             | string   | обязательно                            | `"pipeline"`          |                                                                           |
+| `description`      | string   | обязательно                            | непустая              |                                                                           |
+| `entrypoint`       | boolean  | обязательно                            | `true` \| `false`     | Явное указание обязательно. Компилятор отклоняет pipeline без этого поля. |
+| `strict`           | boolean  | обязательно                            | `true` \| `false`     | Явное указание обязательно. Компилятор отклоняет pipeline без этого поля. |
+| `flow`             | array    | обязательно                            | непустой массив шагов | Шаги выполняются последовательно.                                         |
+| `message`          | string   | обязательно если `strict: true`        | непустая              | Сообщение итогового EXCEPTION при срабатывании strict-эскалации.          |
+| `strictCode`       | string   | опционально, только при `strict: true` | непустая              | Код итогового EXCEPTION. По умолчанию: `"STRICT_PIPELINE_FAILED"`.        |
+| `required_context` | string[] | опционально                            | массив строк          | Обязательные ключи runtime-контекста. См. раздел ниже.                    |
+
+### Поле `entrypoint`
+
+| Значение | Смысл                                                                                           |
+| -------- | ----------------------------------------------------------------------------------------------- |
+| `true`   | Публичный сценарий. Может быть вызван через `runPipeline` напрямую по имени.                    |
+| `false`  | Внутренний блок. Вызывается только из `flow` другого pipeline, не может быть запрошен напрямую. |
+
+### Поле `strict`
+
+При `strict: true` рантайм после выполнения pipeline проверяет список накопленных внутри него issues. Если есть хотя бы одна issue с `level: "ERROR"` или `level: "EXCEPTION"`, добавляется итоговая issue с `level: "EXCEPTION"` и выполнение останавливается (`STOP`). Правила внутри `strict`-пайплайна остаются с исходными уровнями — меняется только итоговое поведение группы.
+
+### Поле `required_context`
+
+Массив обязательных ключей runtime-контекста. Если хотя бы один ключ не передан в `__context`, движок завершает выполнение с `EXCEPTION` до исполнения шагов pipeline:
+
+```json
+"required_context": ["merchantId", "currentDate"]
+```
+
+### Запрет циклов (DAG)
+
+Граф вызовов пайплайнов (`{ "pipeline": "..." }` во `flow`) должен быть ациклическим направленным графом. Цикл вида `A → B → A` — ошибка компиляции:
+
+```
+Pipeline cycle detected: pipeline_A -> pipeline_B -> pipeline_A
+```
+
+### Примеры
+
+```json
+{
+  "id": "entrypoints.customer.full_validation",
+  "type": "pipeline",
+  "description": "Сценарий полной проверки клиента",
+  "entrypoint": true,
+  "strict": false,
+  "flow": [{ "pipeline": "internal.customer.full_validation" }]
+}
+```
+
+```json
+{
+  "id": "internal.customer.blocks.tax_check",
+  "type": "pipeline",
+  "description": "Строгая проверка налогового статуса",
+  "entrypoint": false,
+  "strict": true,
+  "message": "Ошибки при проверке налогового статуса",
+  "strictCode": "TAX_CHECK_FAILED",
+  "flow": [
+    { "rule": "library.tax.resident_bool" },
+    { "rule": "library.tax.resident_not_restricted" },
+    { "condition": "library.order.cond_international_block" }
+  ]
+}
+```
+
+## 7. Артефакт: dictionary
+
+Справочник значений для оператора `in_dictionary`. Глобально доступен из любого правила.
+
+### Схема
+
+| Поле          | Тип    | Обязательность | Допустимые значения | Описание                    |
+| ------------- | ------ | -------------- | ------------------- | --------------------------- |
+| `id`          | string | обязательно    | уникальный          |                             |
+| `type`        | string | обязательно    | `"dictionary"`      |                             |
+| `description` | string | обязательно    | непустая            |                             |
+| `entries`     | array  | обязательно    | непустой массив     | Список допустимых значений. |
+
+### Формат `entries`
+
+Каждый элемент массива может быть:
+
+| Форма                     | Сравнение               |
+| ------------------------- | ----------------------- |
+| `"строка"`                | `value === entry`       |
+| `{ "code": "...", ... }`  | `value === entry.code`  |
+| `{ "value": "...", ... }` | `value === entry.value` |
+
+Сравнение строгое (`===`). Тип значения поля payload должен совпадать с типом в `entries`.
+
+### Пример
+
+```json
+{
+  "id": "document_type_codes",
+  "type": "dictionary",
+  "description": "Допустимые коды типов документов",
+  "entries": ["passport", "national_id", "residence_permit", "other"]
+}
+```
+
+## 8. Шаги (steps и flow)
+
+Шаги используются во `flow` у pipeline и в `steps` у condition. Каждый шаг это объект ровно с одним ключом из трёх допустимых.
+
+### Допустимые форматы шага
+
+```json
+{ "rule": "<ref>" }
+{ "condition": "<ref>" }
+{ "pipeline": "<ref>" }
+```
+
+Объект с двумя и более ключами или с неизвестным ключом приедет к ошибке компиляции.
+
+### Опциональное поле `stepId`
+
+Шаг может содержать дополнительное поле `stepId: string` как стабильный идентификатор шага для трейсинга и аудита. Не влияет на логику выполнения.
+
+```json
+{ "rule": "library.customer.id_required", "stepId": "step_001" }
+```
+
+### Ссылки в шагах
+
+| Ключ        | Ссылается на                             | Разрешение                                           |
+| ----------- | ---------------------------------------- | ---------------------------------------------------- |
+| `rule`      | артефакт с `type: "rule"` (любой `role`) | по правилам раздела 3 (поддерживает scoped ref)      |
+| `condition` | артефакт с `type: "condition"`           | по правилам раздела 3 (поддерживает scoped ref)      |
+| `pipeline`  | артефакт с `type: "pipeline"`            | только абсолютный `id`, scoped ref не поддерживается |
+
+> Шаг `{ "rule": "..." }` с предикатом (`role: "predicate"`) синтаксически допустим и компилируется без ошибок. В рантайме предикат выполнится, но его результат `TRUE` или `FALSE` будет проигнорирован, то issue не создаётся, поток не останавливается.
+
+## 9. Семантика полей payload
+
+### Формат `field`
+
+Значение `field` это путь до ключа во flat-map проверяемого payload в dot-notation:
+
+```
+"customer.taxId"
+"customer.birthDate"
+"accounts[0].balance"
+"accounts[*].balance"   ← wildcard
+```
+
+Движок принимает как структурированный JSON, так и уже плоский payload (функция `flattenPayload` идемпотентна).
+
+### Доступ к контексту: `$context.*`
+
+Поля с префиксом `$context.` обращаются к полям объекта `context` запроса, а не к `payload`:
+
+```json
+{
+  "field": "$context.merchantId",
+  "operator": "in_dictionary",
+  "dictionary": { "type": "static", "id": "allowed_merchants" }
+}
+```
+
+`$context.*` зарезервированный префикс. Wildcard `[*]` в `$context.*` не поддерживается.
+
+### Семантика пустого значения
+
+`not_empty` считает поле пустым если оно:
+
+- отсутствует во flat-map (`deepGet` вернул `ok: false`), или
+- равно `null`, или
+- равно `""` (пустая строка).
+
+`false`, `0`, `[]` не считаются пустыми.
+
+`is_empty` инверсия `not_empty`. Если поле отсутствует, возвращает `OK` (поле считается пустым).
+
+## 10. Поведение компилятора
+
+Компиляция выполняется последовательно в 7 фаз. Каждая фаза собирает все ошибки перед остановкой. Ошибки разных фаз не смешиваются. При любой ошибке компиляции результат не возвращается и выбрасывается `CompilationError`.
+
+| Фаза                        | Что проверяется                                        | Условие остановки                                |
+| --------------------------- | ------------------------------------------------------ | ------------------------------------------------ |
+| 1. `buildRegistry`          | уникальность `id`, наличие `id`, `type`, `description` | при первой ошибке реестра                        |
+| 2. `validateSchema`         | структура каждого артефакта по типу                    | все ошибки схемы за один прогон                  |
+| 3. `validateCodeUniqueness` | уникальность `code` среди check-правил                 | все дубли за один прогон                         |
+| 4. `validateRefs`           | ссылки и видимость                                     | все ошибки ссылок за один прогон                 |
+| 5. `buildConditions`        | нормализация condition-шагов                           | assert (не должно падать если фазы 1–4 пройдены) |
+| 6. `buildPipelines`         | нормализация pipeline-шагов                            | assert                                           |
+| 7. `validatePipelineDAG`    | отсутствие циклов в графе вызовов pipeline             | все циклы за один прогон                         |
+
+## 11. Поведение рантайма
+
+### Матрица статусов ответа
+
+| Ситуация                                           | `status`           | `control`  |
+| -------------------------------------------------- | ------------------ | ---------- |
+| Нет issues                                         | `OK`               | `CONTINUE` |
+| Только `WARNING`-issues (нет ERROR/EXCEPTION)      | `OK_WITH_WARNINGS` | `CONTINUE` |
+| Есть хотя бы один `ERROR` (нет `EXCEPTION`)        | `ERROR`            | `STOP`     |
+| Сработало `EXCEPTION`-правило или strict-эскалация | `EXCEPTION`        | `STOP`     |
+| Рантайм-исключение движка                          | `ABORT`            | —          |
+
+> `OK_WITH_WARNINGS` означает, что все обязательные проверки пройдены, но есть нефатальные замечания. Вызывающая сторона может обрабатывать его отдельно от `OK` или приравнивать к нему в зависимости от бизнес-логики.
+
+### Формат issue в массиве `issues`
+
+| Поле         | Тип            | Всегда присутствует | Описание                                                                                |
+| ------------ | -------------- | ------------------- | --------------------------------------------------------------------------------------- |
+| `kind`       | string         | да                  | Всегда `"ISSUE"`                                                                        |
+| `level`      | string         | да                  | `"WARNING"`, `"ERROR"`, `"EXCEPTION"`                                                   |
+| `code`       | string         | да                  | Код из правила или `strictCode` пайплайна                                               |
+| `message`    | string         | да                  | Сообщение из правила или `message` пайплайна                                            |
+| `field`      | string \| null | да                  | Поле payload (для wildcard — конкретный ключ, не паттерн). `null` для strict-эскалации. |
+| `ruleId`     | string         | да                  | `id` правила. Для strict-эскалации — `"pipeline:{pipelineId}"`.                         |
+| `expected`   | any            | нет                 | Ожидаемое значение (`value` или `dictionary` из правила).                               |
+| `actual`     | any            | нет                 | Фактическое значение поля в payload.                                                    |
+| `stepId`     | string         | нет                 | `stepId` из шага, если был задан.                                                       |
+| `meta`       | object         | нет                 | `meta` из правила или агрегационные метаданные.                                         |
+| `pipelineId` | string         | нет                 | Только для strict-эскалации.                                                            |
+
+### Поведение по уровням в рантайме
+
+| `level`     | Создаётся issue | Поток останавливается | Влияние на итоговый `status`                  |
+| ----------- | --------------- | --------------------- | --------------------------------------------- |
+| `WARNING`   | да              | нет                   | `OK_WITH_WARNINGS` (если нет ERROR/EXCEPTION) |
+| `ERROR`     | да              | нет                   | `ERROR`                                       |
+| `EXCEPTION` | да              | **да**, немедленно    | `EXCEPTION`                                   |
+
+После остановки по `EXCEPTION` оставшиеся шаги pipeline не выполняются. Уже накопленные issues сохраняются в ответе.
+
+### Опция `trace`
+
+По умолчанию движок пишет полный trace выполнения. Для отключения сбора трейса (в целях производительности) передайте `{ trace: false }` четвёртым аргументом в `runPipeline`:
+
+```js
+engine.runPipeline(compiled, pipelineId, payload, { trace: false });
+```
+
+При `trace: false` массив `trace` в ответе будет пустым.
