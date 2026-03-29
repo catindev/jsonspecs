@@ -325,6 +325,8 @@ function myCheckOperator(rule, ctx) {
   // rule  the artifact object: { field, value, operator, level, code, ... }
   // ctx   runtime context:
   //           ctx.payload            flat map of all payload fields
+  //           ctx.get(path)          reads a field from the flat payload map
+  //           ctx.has(path)          checks whether a field is present
   //           ctx.getDictionary(id)  looks up a dictionary by id
   //           ctx.payloadKeys        all keys present in the payload
   //           ctx.wildcardCache      Map for wildcard expansion caching
@@ -346,13 +348,26 @@ function myPredicateOperator(rule, ctx) {
 }
 ```
 
-### Using `deepGet`
+### Preferred field access: `ctx.get()` / `ctx.has()`
 
-`deepGet` is the standard way to read a field from the flat payload.
-Import it from `json-specs`:
+`ctx.get(path)` is the preferred contract for new custom operators. It returns the same shape as `deepGet`: `{ ok, value }`, including support for `$context.*` fields.
 
 ```js
-const { deepGet } = require("json-specs");
+module.exports = function myOperator(rule, ctx) {
+  const got = ctx.get(rule.field);
+  if (!got.ok) return { status: "FAIL" };
+  return { status: got.value ? "OK" : "FAIL", actual: got.value };
+};
+```
+
+Use `ctx.has(path)` when you only need presence/absence.
+
+### Using `deepGet`
+
+`deepGet` remains available for backward compatibility and advanced use cases. Import it from `jsonspecs` when you explicitly need the helper:
+
+```js
+const { deepGet } = require("jsonspecs");
 
 function myOperator(rule, ctx) {
   const got = deepGet(ctx.payload, rule.field);
@@ -374,7 +389,7 @@ deepGet(ctx.payload, "$context.currentDate");
 ### Full example date not in the past
 
 ```js
-const { createEngine, Operators, deepGet } = require("json-specs");
+const { createEngine, Operators } = require("jsonspecs");
 
 const myOperators = {
   check: {
@@ -382,7 +397,7 @@ const myOperators = {
 
     // Checks that a date field is today or in the future (>= context date)
     date_not_in_past(rule, ctx) {
-      const got = deepGet(ctx.payload, rule.field);
+      const got = ctx.get(rule.field);
       if (!got.ok || !got.value) return { status: "FAIL", actual: null };
 
       const fieldDate = new Date(got.value);

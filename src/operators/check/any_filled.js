@@ -8,7 +8,7 @@ module.exports = function(rule, ctx) {
       return { status: "EXCEPTION", error: new Error("any_filled requires fields[]") };
     }
     const ok = fields.some((field) => {
-      const got = deepGet(ctx.payload, field);
+      const got = ctx.get(field);
       return got.ok && !isEmptyValue(got.value);
     });
     return { status: ok ? "OK" : "FAIL" };

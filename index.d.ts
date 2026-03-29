@@ -78,8 +78,16 @@ export interface PipelineResult {
 
 /** Context passed to every operator at runtime. */
 export interface OperatorContext {
-  /** Flat payload map. Use deepGet() to read values safely. */
+  /** Flat payload map available for diagnostics and advanced cases. Prefer ctx.get()/ctx.has() in operators. */
   payload: Record<string, unknown>;
+  /** Stable helper to read a field from the flat payload map, including $context.* fields. */
+  get(path: string): { ok: true; value: unknown } | { ok: false; value: undefined };
+  /** Stable helper to check whether a field is present in the flat payload map. */
+  has(path: string): boolean;
+  /** Returns a compiled dictionary artifact by id, or null when missing. */
+  getDictionary(id: string): Record<string, unknown> | null;
+  /** Flat payload keys available for wildcard expansion and diagnostics. */
+  payloadKeys?: string[];
 }
 
 /** Internal result returned by a check operator. */
@@ -190,7 +198,7 @@ export class CompilationError extends Error {
 /**
  * Look up a dot-notation field path in a flat payload map.
  * Supports $context.* prefix for runtime context fields.
- * Exported as a stable helper for use inside custom operators.
+ * Exported as a stable helper for advanced/custom operators and backward compatibility. Prefer ctx.get() in new operators.
  *
  * @example
  * const { ok, value } = deepGet(ctx.payload, 'person.firstName');

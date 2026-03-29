@@ -184,9 +184,23 @@ Each issue:
 
 > **`ABORT`** is returned when an unexpected engine fault occurs (bug in a custom operator, corrupt compiled object, etc.). It is not a validation result — it means the engine itself failed. `issues[]` contains whatever was accumulated before the fault.
 
+### `ctx.get(path)` / `ctx.has(path)`
+
+For new custom operators, prefer the runtime context helpers:
+
+```js
+module.exports = function myOperator(rule, ctx) {
+  const got = ctx.get(rule.field);
+  if (!got.ok) return { status: "FAIL" };
+  return { status: got.value ? "OK" : "FAIL", actual: got.value };
+};
+```
+
+`ctx.has(path)` returns a boolean when you only need presence/absence.
+
 ### `deepGet(payload, field)`
 
-Utility exported for use inside custom operators. Looks up a dot-notation field path in the flat payload map, with support for `$context.*` fields.
+Utility exported for advanced/custom operators and backward compatibility. New operators should prefer ctx.get(). Looks up a dot-notation field path in the flat payload map, with support for `$context.*` fields.
 
 ```js
 const { deepGet } = require("jsonspecs");
@@ -325,7 +339,8 @@ The following exports are **stable** and covered by semantic versioning:
 | `createEngine(options)`   | Creates an engine instance                        |
 | `Operators`               | Built-in operator pack                            |
 | `CompilationError`        | Thrown by `engine.compile()` on invalid artifacts |
-| `deepGet(payload, field)` | Field lookup helper for custom operators          |
+| `ctx.get(path)` / `ctx.has(path)` | Preferred field access contract for new custom operators |
+| `deepGet(payload, field)` | Backward-compatible field lookup helper for custom operators |
 
 Everything under `src/**` is **internal** and may change between minor versions. Do not import from `src/` directly.
 
@@ -336,7 +351,7 @@ See the full guide in [OPERATORS.md](./OPERATORS.md).
 Quick example adding a custom check operator:
 
 ```js
-const { createEngine, Operators, deepGet } = require("jsonspecs");
+const { createEngine, Operators } = require("jsonspecs");
 
 const myOperators = {
   check: {
@@ -344,7 +359,7 @@ const myOperators = {
 
     // Custom check: value must match one of allowed patterns (not just exact strings)
     matches_any_pattern(rule, ctx) {
-      const got = deepGet(ctx.payload, rule.field);
+      const got = ctx.get(rule.field);
       if (!got.ok || got.value == null) return { status: "FAIL" };
       const patterns = Array.isArray(rule.value) ? rule.value : [rule.value];
       const matched = patterns.some((p) =>

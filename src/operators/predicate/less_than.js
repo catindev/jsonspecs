@@ -2,7 +2,7 @@ const { deepGet, toComparable } = require("../../utils");
 
 module.exports = function(rule, ctx) {
   try {
-    const got = deepGet(ctx.payload, rule.field);
+    const got = ctx.get(rule.field);
     if (!got.ok) return { status: "UNDEFINED" };
     const left = toComparable(got.value);
     const right = toComparable(rule.value);

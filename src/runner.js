@@ -144,6 +144,8 @@ function runPipeline(compiled, pipelineId, payload, options) {
     payloadKeys,
     wildcardCache,
     getDictionary: (id) => dictionaries.get(id) || null,
+    get: (path) => deepGet(enrichedPayload, path),
+    has: (path) => deepGet(enrichedPayload, path).ok,
   };
 
   try {

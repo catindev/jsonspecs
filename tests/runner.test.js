@@ -352,3 +352,42 @@ describe("compiler — compiled bundle is detached from source artifacts", () =>
     assert.ok(Object.isFrozen(storedRule));
   });
 });
+
+
+describe("runner — custom operators use ctx.get/ctx.has", () => {
+  it("supports custom operators without importing deepGet", () => {
+    const custom = {
+      check: {
+        custom_not_empty(rule, ctx) {
+          const got = ctx.get(rule.field);
+          return {
+            status: got.ok && String(got.value ?? "").trim() !== "" ? "OK" : "FAIL",
+            actual: got.ok ? got.value : undefined,
+          };
+        },
+      },
+      predicate: {
+        field_present(rule, ctx) {
+          return { status: ctx.has(rule.field) ? "TRUE" : "FALSE" };
+        },
+      },
+    };
+
+    const engine2 = createEngine({
+      operators: {
+        check: { ...Operators.check, ...custom.check },
+        predicate: { ...Operators.predicate, ...custom.predicate },
+      },
+    });
+
+    const r = rule("library.r", "custom_not_empty", "person.name", "ERROR", "NAME.REQUIRED");
+    const pred = predicate("library.pred", "field_present", "person.name");
+    const cond = condition("library.cond", { all: ["library.pred"] }, [{ rule: "library.r" }]);
+    const p = pipeline("p", [{ condition: "library.cond" }]);
+    const compiled = engine2.compile([r, pred, cond, p]);
+
+    assert.equal(engine2.runPipeline(compiled, "p", { person: { name: "Ivan" } }).status, "OK");
+    assert.equal(engine2.runPipeline(compiled, "p", { person: { name: "" } }).status, "ERROR");
+    assert.equal(engine2.runPipeline(compiled, "p", { person: {} }).status, "OK");
+  });
+});
