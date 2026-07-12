@@ -21,7 +21,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run test:pack
-      - run: npm publish --provenance --access public
+      - run: npm publish --provenance --access public --tag next
         env:
           NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}"
       - name: Create GitHub release
