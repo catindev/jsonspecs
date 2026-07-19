@@ -27,6 +27,7 @@ const FIELD_COMPARE_OPERATORS = new Set([
   'field_less_or_equal_than_field',
   'field_greater_or_equal_than_field',
 ]);
+const REGEX_FLAGS_RE = /^(?!.*(.).*\1)[ims]*$/;
 
 function schemaDiagnostic(artifact, message, path, code = SCHEMA_CODE, details = null) {
   return artifactDiagnostic(artifact, {
@@ -68,6 +69,15 @@ function validateDictionarySchema(artifact) {
   const seen = new Set();
   for (let index = 0; index < artifact.entries.length; index++) {
     const entry = artifact.entries[index];
+    if (entry === null) {
+      errors.push(schemaDiagnostic(
+        artifact,
+        `Dictionary ${where(artifact)}: entry ${index} must not be null`,
+        `entries[${index}]`,
+        'DICTIONARY_ENTRY_INVALID',
+      ));
+      continue;
+    }
     const value = isObject(entry) ? (Object.hasOwn(entry, 'code') ? entry.code : entry.value) : entry;
     if (value === undefined) {
       errors.push(schemaDiagnostic(
@@ -289,11 +299,13 @@ function validateOperatorParams(artifact, dictionaries) {
     errors.push(schemaDiagnostic(artifact, `Rule ${where(artifact)}: ${artifact.operator} requires value_field`, 'value_field'));
   }
   if (artifact.operator === 'matches_regex') {
+    const flagsError = validateRegexFlags(artifact);
+    if (flagsError) errors.push(flagsError);
     if (typeof artifact.value !== 'string' || artifact.value.length === 0) {
       errors.push(schemaDiagnostic(artifact, `Rule ${where(artifact)}: matches_regex requires value (regex string)`, 'value'));
     } else {
       try {
-        const flags = typeof artifact.flags === 'string' ? artifact.flags : '';
+        const flags = flagsError ? '' : (typeof artifact.flags === 'string' ? artifact.flags : '');
         const pattern = String(artifact.value).replace(/\\\\/g, '\\');
         new RegExp(pattern, flags);
       } catch (error) {
@@ -302,6 +314,20 @@ function validateOperatorParams(artifact, dictionaries) {
     }
   }
   return errors;
+}
+
+function validateRegexFlags(artifact) {
+  if (artifact.flags === undefined) return null;
+  if (typeof artifact.flags !== 'string' || !REGEX_FLAGS_RE.test(artifact.flags)) {
+    return schemaDiagnostic(
+      artifact,
+      `Rule ${where(artifact)}: matches_regex flags must contain only i, m, s without repeats`,
+      'flags',
+      'RULE_REGEX_FLAGS_INVALID',
+      { value: artifact.flags },
+    );
+  }
+  return null;
 }
 
 function validateOptionalMeta(artifact) {

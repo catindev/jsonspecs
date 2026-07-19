@@ -140,6 +140,58 @@ test("registry, uniqueness and DAG diagnostics retain structured provenance", ()
   );
 });
 
+test("validate accepts allowed matches_regex flags for checks and predicates", () => {
+  for (const flags of ["i", "im"]) {
+    assert.equal(validate([regexRule({ flags })]).ok, true, flags);
+    assert.equal(validate([regexRule({ role: "predicate", flags })]).ok, true, `predicate ${flags}`);
+  }
+});
+
+test("validate rejects invalid matches_regex flags for checks", () => {
+  for (const flags of ["g", "u", "ii", 42]) {
+    const result = validate([regexRule({ flags })]);
+    assert.equal(result.ok, false, String(flags));
+    assert.equal(result.diagnostics[0].code, "RULE_REGEX_FLAGS_INVALID");
+    assert.equal(result.diagnostics[0].path, "flags");
+  }
+});
+
+test("validate rejects invalid matches_regex flags for predicates", () => {
+  const predicateResult = validate([regexRule({ role: "predicate", flags: "g" })]);
+  assert.equal(predicateResult.ok, false);
+  assert.equal(predicateResult.diagnostics[0].code, "RULE_REGEX_FLAGS_INVALID");
+  assert.equal(predicateResult.diagnostics[0].path, "flags");
+});
+
+test("validate rejects null dictionary entries and accepts scalar/object entries", () => {
+  const bad = validate([{ id: "dict.bad", type: "dictionary", description: "bad", entries: [null] }]);
+  assert.equal(bad.ok, false);
+  assert.equal(bad.diagnostics[0].code, "DICTIONARY_ENTRY_INVALID");
+  assert.equal(bad.diagnostics[0].path, "entries[0]");
+
+  const good = validate([{ id: "dict.good", type: "dictionary", description: "good", entries: ["a", { code: "b" }] }]);
+  assert.equal(good.ok, true);
+});
+
+function regexRule(overrides = {}) {
+  const role = overrides.role || "check";
+  const base = {
+    id: "library.regex",
+    type: "rule",
+    description: "regex",
+    role,
+    operator: "matches_regex",
+    field: "value",
+    value: "^x$",
+  };
+  if (role === "check") {
+    base.level = "ERROR";
+    base.code = "VALUE.REGEX";
+    base.message = "regex failed";
+  }
+  return { ...base, ...overrides };
+}
+
 function pick(diagnostic) {
   const { code, phase, artifactId, path } = diagnostic;
   return { code, phase, artifactId, path };

@@ -15,6 +15,13 @@ Each operator can be used as a **check** (in a `rule` with `"role": "check"`) or
 
 Operators marked `check only` have no predicate variant.
 
+Predicate variants are available for: `not_empty`, `is_empty`, `is_boolean`,
+`is_string`, `is_number`, `is_integer`, `equals`, `not_equals`, `contains`,
+`matches_regex`, `in_dictionary`, `greater_than`, `less_than`,
+`field_equals_field`, `field_not_equals_field`, `field_greater_than_field`,
+`field_less_than_field`, `field_greater_or_equal_than_field`, and
+`field_less_or_equal_than_field`.
+
 ### `not_empty`
 
 Field must be present and non-empty. Fails if the field is absent, `null`, or an empty string.
@@ -50,6 +57,21 @@ Field must be absent, `null`, or empty string.
   "field": "document.expireDate"
 }
 ```
+
+### Type assertion operators
+
+Strict type guards. They do not coerce values: `"true"` is not a boolean and
+`"5"` is not a number. `null` belongs to none of these types.
+
+| Operator | Check passes when | Predicate is TRUE when | Absent field |
+| --- | --- | --- | --- |
+| `is_boolean` | `typeof value === "boolean"` | same | check FAIL, predicate UNDEFINED |
+| `is_string` | `typeof value === "string"` | same | check FAIL, predicate UNDEFINED |
+| `is_number` | `typeof value === "number"` | same | check FAIL, predicate UNDEFINED |
+| `is_integer` | `typeof value === "number" && Number.isInteger(value)` | same | check FAIL, predicate UNDEFINED |
+
+For `is_integer`, JSON does not distinguish `1` and `1.0`; both parse to the
+number value `1`, so both pass. A value such as `1.5` fails.
 
 ### `equals`
 
@@ -89,9 +111,15 @@ Field must not equal the given `value`.
 }
 ```
 
+### `not_true` _(check only)_
+
+Flag must not be strictly `true`. This is an absence-tolerant negative flag
+check: an absent field, `null`, or `""` passes; only `value === true` fails.
+Values such as `false`, `"true"`, `0`, `1`, and objects pass.
+
 ### `matches_regex`
 
-Field must match the given regular expression. Optional `flags` are passed to `RegExp` and validated at compile time together with the pattern.
+Field must match the given regular expression. Optional `flags` are limited to `i`, `m`, and `s` without repeats and are validated at compile time together with the pattern.
 
 ```json
 {
@@ -109,7 +137,7 @@ Field must match the given regular expression. Optional `flags` are passed to `R
 }
 ```
 
-Use `\\\\` in JSON strings where you need a literal backslash in the regex (e.g. `^\\d{6}$`).
+Use `\\\\` in JSON strings where the regex syntax needs a backslash (e.g. `^\\d{6}$`).
 
 ### `length_equals` _(check only)_
 
@@ -170,7 +198,7 @@ String must contain the given substring.
 
 ### `greater_than`
 
-Field must be greater than `value` (numeric comparison).
+Field must be greater than `value` (numeric or `YYYY-MM-DD` date comparison). Calendar-impossible dates such as `2026-02-30` are not dates, so the comparison fails.
 
 ```json
 {
@@ -189,7 +217,7 @@ Field must be greater than `value` (numeric comparison).
 
 ### `less_than`
 
-Field must be less than `value` (numeric comparison).
+Field must be less than `value` (numeric or `YYYY-MM-DD` date comparison). Calendar-impossible dates such as `2026-02-30` are not dates, so the comparison fails.
 
 ```json
 {
@@ -306,7 +334,7 @@ Two fields must have different values.
 ### `field_less_than_field`
 
 `field` must be strictly less than `value_field`. Supports date strings (`YYYY-MM-DD`)
-and numbers. Supports `$context.*` on either side.
+and numbers. Calendar-impossible dates such as `2026-02-30` are not dates, so the comparison fails. Supports `$context.*` on either side.
 
 ```json
 {
@@ -325,15 +353,15 @@ and numbers. Supports `$context.*` on either side.
 
 ### `field_greater_than_field`
 
-`field` must be strictly greater than `value_field`.
+`field` must be strictly greater than `value_field`. Calendar-impossible dates such as `2026-02-30` are not dates, so the comparison fails.
 
 ### `field_less_or_equal_than_field`
 
-`field` must be ≤ `value_field`.
+`field` must be ≤ `value_field`. Calendar-impossible dates such as `2026-02-30` are not dates, so the comparison fails.
 
 ### `field_greater_or_equal_than_field`
 
-`field` must be ≥ `value_field`.
+`field` must be ≥ `value_field`. Calendar-impossible dates such as `2026-02-30` are not dates, so the comparison fails.
 
 ## Writing custom operators
 

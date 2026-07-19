@@ -113,6 +113,10 @@ function validateConditionWhen(artifact, registry, scopePipelineId) {
       }
       return;
     }
+    if (expression.mode === 'not') {
+      visit(expression.item, `${path}.not`);
+      return;
+    }
     for (let index = 0; index < (expression.items || []).length; index++) {
       visit(expression.items[index], `${path}.${expression.mode}[${index}]`);
     }

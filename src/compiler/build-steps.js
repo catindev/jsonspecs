@@ -54,6 +54,9 @@ function compileWhenExpr(expr, scopePipelineId) {
   if (expr.mode === "single") {
     return { mode: "single", predId: resolveRef("rule", expr.pred, scopePipelineId) };
   }
+  if (expr.mode === "not") {
+    return { mode: "not", item: compileWhenExpr(expr.item, scopePipelineId) };
+  }
   return {
     mode: expr.mode,
     items: expr.items.map((item) => compileWhenExpr(item, scopePipelineId)),

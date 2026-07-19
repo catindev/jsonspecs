@@ -32,6 +32,7 @@ const { createHash } = require('node:crypto');
 const { cloneJsonSafe } = require('../safe-json');
 const { createPrepared } = require('../prepared');
 const { diagnostic, artifactDiagnostic } = require('./diagnostic');
+const { version: ENGINE_VERSION } = require('../../package.json');
 
 function compile(artifacts, options = {}) {
   assert(Array.isArray(artifacts), 'compile: artifacts must be an array');
@@ -76,6 +77,7 @@ function compile(artifacts, options = {}) {
     const sourceHash = computeSourceHash(detachedArtifacts);
     const provenance = Object.freeze({
       sourceHash,
+      engineVersion: ENGINE_VERSION,
       ...(options.provenance && typeof options.provenance.rulesetVersion === 'string'
         ? { rulesetVersion: options.provenance.rulesetVersion }
         : {}),

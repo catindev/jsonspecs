@@ -2,6 +2,10 @@ const pred_equals = require("./predicate/equals");
 const pred_not_equals = require("./predicate/not_equals");
 const pred_not_empty = require("./predicate/not_empty");
 const pred_is_empty = require("./predicate/is_empty");
+const pred_is_boolean = require("./predicate/is_boolean");
+const pred_is_string = require("./predicate/is_string");
+const pred_is_number = require("./predicate/is_number");
+const pred_is_integer = require("./predicate/is_integer");
 const pred_matches_regex = require("./predicate/matches_regex");
 const pred_in_dictionary = require("./predicate/in_dictionary");
 const pred_contains = require("./predicate/contains");
@@ -10,6 +14,11 @@ const pred_less_than = require("./predicate/less_than");
 
 const chk_not_empty = require("./check/not_empty");
 const chk_is_empty = require("./check/is_empty");
+const chk_not_true = require("./check/not_true");
+const chk_is_boolean = require("./check/is_boolean");
+const chk_is_string = require("./check/is_string");
+const chk_is_number = require("./check/is_number");
+const chk_is_integer = require("./check/is_integer");
 const chk_length_equals = require("./check/length_equals");
 const chk_length_max = require("./check/length_max");
 const chk_matches_regex = require("./check/matches_regex");
@@ -39,6 +48,10 @@ const Operators = {
     not_equals: pred_not_equals,
     not_empty: pred_not_empty,
     is_empty: pred_is_empty,
+    is_boolean: pred_is_boolean,
+    is_string: pred_is_string,
+    is_number: pred_is_number,
+    is_integer: pred_is_integer,
     matches_regex: pred_matches_regex,
     in_dictionary: pred_in_dictionary,
     contains: pred_contains,
@@ -52,6 +65,11 @@ const Operators = {
   check: {
     not_empty: chk_not_empty,
     is_empty: chk_is_empty,
+    not_true: chk_not_true,
+    is_boolean: chk_is_boolean,
+    is_string: chk_is_string,
+    is_number: chk_is_number,
+    is_integer: chk_is_integer,
     length_equals: chk_length_equals,
     length_max: chk_length_max,
     matches_regex: chk_matches_regex,

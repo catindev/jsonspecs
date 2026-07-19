@@ -108,6 +108,45 @@ function flattenPayloadSafe(payload) {
   return result;
 }
 
+function cloneContextSafe(context) {
+  if (context === null || typeof context !== "object" || Array.isArray(context)) {
+    throw new SafeJsonError("INVALID_EVALUATION_INPUT", "context must be a JSON object", { path: "$" });
+  }
+  const ancestors = new WeakSet();
+
+  function visit(value, path) {
+    if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+    if (typeof value === "number") {
+      if (!Number.isFinite(value)) throw new SafeJsonError("PAYLOAD_NOT_JSON_SAFE", `Non-finite number at ${path}`, { path });
+      return value;
+    }
+    if (typeof value !== "object") {
+      throw new SafeJsonError("PAYLOAD_NOT_JSON_SAFE", `Unsupported ${typeof value} at ${path}`, { path, type: typeof value });
+    }
+    if (ancestors.has(value)) throw new SafeJsonError("PAYLOAD_CYCLE_DETECTED", `Cycle detected at ${path}`, { path });
+    const proto = Object.getPrototypeOf(value);
+    if (!Array.isArray(value) && proto !== Object.prototype && proto !== null) {
+      throw new SafeJsonError("PAYLOAD_NOT_JSON_SAFE", `Non-plain object at ${path}`, { path });
+    }
+    ancestors.add(value);
+    let output;
+    if (Array.isArray(value)) {
+      output = value.map((item, index) => visit(item, `${path}[${index}]`));
+    } else {
+      output = Object.create(null);
+      for (const key of Object.keys(value)) {
+        const next = path === "$" ? key : `${path}.${key}`;
+        assertSafeKey(key, next);
+        output[key] = visit(value[key], next);
+      }
+    }
+    ancestors.delete(value);
+    return output;
+  }
+
+  return visit(context, "$");
+}
+
 function normalizeTransportSafe(value) {
   const seen = new WeakSet();
   function visit(input, inArray) {
@@ -129,4 +168,4 @@ function normalizeTransportSafe(value) {
   return visit(value, false);
 }
 
-module.exports = { DANGEROUS_KEYS, SafeJsonError, hasOwn, assertSafePath, cloneJsonSafe, flattenPayloadSafe, normalizeTransportSafe };
+module.exports = { DANGEROUS_KEYS, SafeJsonError, hasOwn, assertSafePath, cloneJsonSafe, flattenPayloadSafe, cloneContextSafe, normalizeTransportSafe };

@@ -145,8 +145,13 @@ Scope для pipeline это его собственный `id`. Scope для co
 | ----------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------ |
 | `not_empty`                         | —                                            | поле присутствует и не равно `null`, `""`, `undefined`                          | FAIL                                             |
 | `is_empty`                          | —                                            | поле отсутствует, равно `null` или `""`                                         | OK (поле отсутствует — считается пустым)         |
+| `is_boolean`                        | —                                            | `typeof field === "boolean"`                                                    | FAIL                                             |
+| `is_string`                         | —                                            | `typeof field === "string"`                                                     | FAIL                                             |
+| `is_number`                         | —                                            | `typeof field === "number"`                                                     | FAIL                                             |
+| `is_integer`                        | —                                            | поле является числом с нулевой дробной частью                                   | FAIL                                             |
 | `equals`                            | `value: any`                                 | `field === value` (строгое равенство)                                           | FAIL                                             |
 | `not_equals`                        | `value: any`                                 | `field !== value`                                                               | FAIL                                             |
+| `not_true`                          | —                                            | поле отсутствует, равно `null`, `""` или любому значению кроме строгого `true`   | OK                                               |
 | `contains`                          | `value: string`                              | строковое значение поля содержит `value` как подстроку                          | FAIL                                             |
 | `matches_regex`                     | `value: string` (regex), `flags?: string`    | строковое значение поля соответствует регулярному выражению `value`             | FAIL                                             |
 | `greater_than`                      | `value: number \| "YYYY-MM-DD"`              | поле > value; сравнение числовое или датовое (тип определяется автоматически)   | FAIL                                             |
@@ -162,21 +167,25 @@ Scope для pipeline это его собственный `id`. Scope для co
 | `in_dictionary`                     | `dictionary: { type: "static", id: string }` | значение поля входит в список `entries` словаря                                 | FAIL                                             |
 | `any_filled`                        | `fields: string[]`                           | хотя бы одно поле из списка непустое. `field` в этом операторе не используется. | FAIL если ни одно не заполнено                   |
 
-> **`matches_regex` поле `flags`:** необязательный строковый параметр флагов регулярного выражения (`"i"`, `"m"`, `"s"` и т.д.). Если не задан, флаги не применяются. Компилятор проверяет валидность паттерна и флагов на фазе компиляции — невалидный паттерн является ошибкой компиляции.
+> **`matches_regex` поле `flags`:** если задано, компилятор принимает только строку из `i`, `m` и `s` без повторяющихся символов. Компилятор проверяет валидность паттерна и флагов на фазе компиляции.
 
-> **`matches_regex` экранирование:** обратные слэши в JSON-строке двойные (`\\d`); движок нормализует их в одинарные (`\d`) перед передачей в `new RegExp()`.
+> **`matches_regex` экранирование:** перед передачей `value` в `new RegExp()` движок один раз заменяет каждую пару последовательных обратных слэшей на один обратный слэш. Это поддерживает паттерны вроде `^\\d{6}$`.
 
 > **`any_filled`** особый оператор: принимает `fields[]` вместо `field`. Поле `field` при использовании `any_filled` может быть опущено. Компилятор требует непустой `fields[]`.
 
-> **`in_dictionary`** `dictionary.type`: единственное поддерживаемое значение `"static"`. Другие значения вызывают ошибку рантайма.
+> **`in_dictionary`** `dictionary.type`: единственное поддерживаемое значение `"static"`. Записи словаря могут быть объектами с `code`/`value` или скалярами `string`, `number`, `boolean`; сравнение строгое, без коэрции. `null` в `entries` является ошибкой валидации.
 
-> **`greater_than`, `less_than`, `field_*_field`:** сравниваются только числа и даты формата `YYYY-MM-DD`. Если тип значения не определяется — FAIL.
+> **Type assertion операторы** не выполняют коэрцию. Для `is_integer` JSON не различает `1` и `1.0`: оба значения парсятся как число `1` и проходят. Значение `1.5` не проходит.
+
+> **`greater_than`, `less_than`, `field_*_field`:** сравниваются только конечные числа, числовые строки по грамматике `^[+-]?\d+(\.\d+)?([eE][+-]?\d+)?$` и строгие даты формата `YYYY-MM-DD`. Несуществующие календарные даты не считаются датами. Если тип значения не определяется — FAIL.
+
+Набор операторов — обычный JavaScript-объект, переданный в `createEngine({ operators })`. Если вызывающая сторона собирает набор через object spread и одно имя оператора встречается несколько раз, побеждает последнее свойство. Локальные операторы проекта могут переопределять встроенные, если указаны после `Operators.check` или `Operators.predicate`.
 
 #### predicate-операторы
 
-Подмножество check-операторов. Недоступны: `any_filled`, `length_equals`, `length_max`.
+Подмножество check-операторов. Недоступны: `any_filled`, `length_equals`, `length_max`, `not_true`.
 
-Доступны: `not_empty`, `is_empty`, `equals`, `not_equals`, `contains`, `matches_regex`, `greater_than`, `less_than`, `field_equals_field`, `field_not_equals_field`, `field_greater_or_equal_than_field`, `field_less_or_equal_than_field`, `in_dictionary`.
+Доступны: `not_empty`, `is_empty`, `is_boolean`, `is_string`, `is_number`, `is_integer`, `equals`, `not_equals`, `contains`, `matches_regex`, `greater_than`, `less_than`, `field_equals_field`, `field_not_equals_field`, `field_greater_than_field`, `field_less_than_field`, `field_greater_or_equal_than_field`, `field_less_or_equal_than_field`, `in_dictionary`.
 
 Предикатные операторы возвращают `TRUE`, `FALSE`, `UNDEFINED`. Значение `UNDEFINED` рантаймом трактуется как `FALSE`.
 
@@ -258,7 +267,7 @@ Scope для pipeline это его собственный `id`. Scope для co
 
 ### Поле `when`
 
-Три базовые формы:
+Четыре базовые формы:
 
 ```json
 "when": "pred_is_international"
@@ -272,15 +281,22 @@ Scope для pipeline это его собственный `id`. Scope для co
 "when": { "any": ["pred_a", "pred_b"] }
 ```
 
+```json
+"when": { "not": "pred_a" }
+```
+
 | Форма              | Семантика                                                  |
 | ------------------ | ---------------------------------------------------------- |
 | строка             | одиночный predicate; condition активируется если он `TRUE` |
 | `{ "all": [...] }` | все predicates должны вернуть `TRUE`                       |
 | `{ "any": [...] }` | хотя бы один predicate должен вернуть `TRUE`               |
+| `{ "not": expr }`  | condition активируется если вложенное выражение ложно      |
 
-Элементы `all`/`any` могут быть как строками-ссылками, так и вложенными объектами `{ "all": [...] }` / `{ "any": [...] }` — поддерживается произвольная глубина вложенности (см. раздел о вложенных `when`).
+Элементы `all`/`any` могут быть как строками-ссылками, так и вложенными объектами `{ "all": [...] }` / `{ "any": [...] }` / `{ "not": ... }` — поддерживается произвольная глубина вложенности (см. раздел о вложенных `when`).
 
 Каждая конечная ссылка разрешается по правилам раздела 3 и должна указывать на правило с `role: "predicate"`. Ссылка на `role: "check"` вызовет ошибку компиляции.
+
+Predicate-операторы трёхзначны (`TRUE`, `FALSE`, `UNDEFINED`), но leaf со значением `UNDEFINED` приводится к `FALSE` до вычисления внешнего выражения. Поэтому `not` инвертирует уже булево значение: если `"when": { "not": "pred_has_field" }` ссылается на predicate по отсутствующему полю, predicate вернёт `UNDEFINED`, leaf станет `FALSE`, `not` превратит его в `TRUE`, и condition активируется.
 
 ### Вывод scope из id
 
@@ -295,7 +311,7 @@ Scope для pipeline это его собственный `id`. Scope для co
 
 ### Вложенные when-выражения
 
-`condition.when` поддерживает рекурсивные комбинации `all`/`any`:
+`condition.when` поддерживает рекурсивные комбинации `all`/`any`/`not`:
 
 ```json
 {
@@ -303,17 +319,19 @@ Scope для pipeline это его собственный `id`. Scope для co
     "all": [
       "library.common.pred_phone_missing",
       {
-        "any": [
-          "library.order.pred_is_international",
-          "library.tax.pred_foreign_resident"
-        ]
+        "not": {
+          "any": [
+            "library.order.pred_is_international",
+            "library.tax.pred_foreign_resident"
+          ]
+        }
       }
     ]
   }
 }
 ```
 
-Это означает: первое условие истинно **и одновременно** истинно хотя бы одно из вложенных условий.
+Это означает: первое условие истинно **и одновременно** ни одно из вложенных условий не истинно.
 
 ### Пример
 
@@ -562,7 +580,7 @@ Pipeline cycle detected: pipeline_A -> pipeline_B -> pipeline_A
 | `actual`     | any            | нет                 | Фактическое значение поля в payload.                                                    |
 | `stepId`     | string         | нет                 | `stepId` из шага, если был задан.                                                       |
 | `meta`       | object         | нет                 | `meta` из правила или агрегационные метаданные.                                         |
-| `pipelineId` | string         | нет                 | Только для strict-эскалации.                                                            |
+| `pipelineId` | string         | да                  | Непосредственный pipeline, который создал issue.                                        |
 
 ### Поведение по уровням в рантайме
 
@@ -578,7 +596,7 @@ Pipeline cycle detected: pipeline_A -> pipeline_B -> pipeline_A
 
 `validate(artifacts, options)` возвращает `{ok, diagnostics}` и не бросает исключения для обычных ошибок исходников. Каждая diagnostic имеет стабильные поля `code`, `level`, `message`, `phase`, `artifactId`, `path` и `location`. Фазы компилятора формируют эти поля напрямую, а не выводят их из текста сообщения. `path` указывает на проблемное свойство относительно артефакта, а `location` равно `file`, `file:line` или `file:line:column`, если значение передано через `options.sources`; иначе `location` равно `null`. `compile()` возвращает opaque artifact `prepared-jsonspecs`; runtime internals доступны только через `inspect()`.
 
-`runPipeline(prepared, {pipelineId?, payload, context?}, options)` принимает prepared artifact. Если `pipelineId` не передан, ровно один pipeline должен быть помечен `entrypoint`. Runtime result для валидного prepared artifact всегда содержит `status`, `control`, `issues` и `ruleset`. `ruleset.sourceHash` идентифицирует скомпилированные artifacts; snapshot-сборки дополнительно передают опциональные `rulesetVersion` и `projectId`. `ABORT` содержит `{code,message,details}` и никогда не раскрывает stack. Trace выключен по умолчанию и включается через `basic` или `verbose`.
+`runPipeline(prepared, {pipelineId?, payload, context?}, options)` принимает prepared artifact. Если `pipelineId` не передан, ровно один pipeline должен быть помечен `entrypoint`. `payload` и `context` должны быть JSON-safe объектами: циклы, опасные ключи, не-конечные числа, не-plain объекты, массив или примитивный top-level `context` завершают выполнение с `ABORT`. Runtime клонирует и валидирует `context` до вычисления; legacy `payload.__context` проходит те же проверки. Runtime result для валидного prepared artifact всегда содержит `status`, `control`, `issues` и `ruleset`. `ruleset.sourceHash` идентифицирует скомпилированные artifacts, `ruleset.engineVersion` — версию движка; snapshot-сборки дополнительно передают опциональные `rulesetVersion` и `projectId`. `ABORT` содержит `{code,message,details}` и никогда не раскрывает stack. Trace выключен по умолчанию и включается через `basic` или `verbose`.
 
 Исключение из `traceRedactor` изолируется и возвращается как `ABORT` с кодом `TRACE_REDACTOR_ERROR`; оно не выходит наружу из `runPipeline`. Неожиданные сбои движка используют нейтральный fallback code `RUNTIME_ABORT`.
 

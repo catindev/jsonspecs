@@ -1,4 +1,5 @@
-const { deepGet } = require("../../utils");
+const { dictionaryEntryMatches } = require("../dictionary-entry");
+
 module.exports = function(rule, ctx) {
   try {
     const got = ctx.get(rule.field);
@@ -9,7 +10,7 @@ module.exports = function(rule, ctx) {
     if (!dict) return { status: "EXCEPTION", error: new Error(`Dictionary not found: ${dictRef.id}`) };
     const v = got.value;
     const entries = Array.isArray(dict.entries) ? dict.entries : [];
-    const ok = entries.some((e) => (typeof e === "string" ? e === v : (e.code === v || e.value === v)));
+    const ok = entries.some((entry) => dictionaryEntryMatches(entry, v));
     return { status: ok ? "OK" : "FAIL" };
   } catch (e) { return { status: "EXCEPTION", error: e }; }
 };

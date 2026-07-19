@@ -151,10 +151,15 @@ Their presence causes a compilation error.
 | ----------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------- |
 | `not_empty`                         | —                                            | field is present and not `null`, `""`, or `undefined`                                 | FAIL                                  |
 | `is_empty`                          | —                                            | field is absent, `null`, or `""`                                                      | OK (absent = empty)                   |
+| `is_boolean`                        | —                                            | `typeof field === "boolean"`                                                          | FAIL                                  |
+| `is_string`                         | —                                            | `typeof field === "string"`                                                           | FAIL                                  |
+| `is_number`                         | —                                            | `typeof field === "number"`                                                           | FAIL                                  |
+| `is_integer`                        | —                                            | field is a number with zero fractional part                                           | FAIL                                  |
 | `equals`                            | `value: any`                                 | `field === value` (strict equality)                                                   | FAIL                                  |
 | `not_equals`                        | `value: any`                                 | `field !== value`                                                                     | FAIL                                  |
+| `not_true`                          | —                                            | field is absent, `null`, `""`, or any value except strict `true`                       | OK                                    |
 | `contains`                          | `value: string`                              | string field contains `value` as substring                                            | FAIL                                  |
-| `matches_regex`                     | `value: string` (regex)                      | string field matches regex pattern in `value`                                         | FAIL                                  |
+| `matches_regex`                     | `value: string` (regex), `flags?: string`    | string field matches regex pattern in `value`                                         | FAIL                                  |
 | `greater_than`                      | `value: number \| "YYYY-MM-DD"`              | field > value; numeric or date comparison (type auto-detected)                        | FAIL                                  |
 | `less_than`                         | `value: number \| "YYYY-MM-DD"`              | field < value                                                                         | FAIL                                  |
 | `length_equals`                     | `value: number`                              | `String(field).length === value`                                                      | FAIL                                  |
@@ -166,21 +171,32 @@ Their presence causes a compilation error.
 | `field_greater_or_equal_than_field` | `value_field: string`                        | `field >= value_field`                                                                | FAIL on type mismatch or absent field |
 | `field_less_or_equal_than_field`    | `value_field: string`                        | `field <= value_field`                                                                | FAIL on type mismatch or absent field |
 | `in_dictionary`                     | `dictionary: { type: "static", id: string }` | field value is in the dictionary's `entries` list                                     | FAIL                                  |
-| `any_filled`                        | `fields: string[]`                           | at least one field in the list is non-empty. `field` is ignored; `fields` is required | FAIL if none are filled               |
+| `any_filled`                        | `fields: string[]` or `paths: string[]`      | at least one field in the list is non-empty. `field` is ignored; `fields` is canonical | FAIL if none are filled               |
 
-> **`any_filled`** is special: it takes `fields[]` instead of `field`. The `field` property may be omitted. The compiler requires a non-empty `fields[]`.
+> **`any_filled`** is special: it takes `fields[]` instead of `field`. The `field` property may be omitted. `paths[]` is accepted as a legacy alias for `fields[]`; `fields[]` is the canonical form.
 
 > **`in_dictionary`** `dictionary.type`: only `"static"` is supported. Other values cause a runtime error.
 
-> **`matches_regex`** escaping: backslashes in JSON strings are doubled (`\\\\d`); the engine normalises them to single backslashes (`\\d`) before passing to `new RegExp()`.
+> **`matches_regex`** `flags`: if present, the compiler accepts only a string made from `i`, `m`, and `s` without repeated characters.
 
-> **`greater_than`, `less_than`, `field_*_field`**: only numbers and `YYYY-MM-DD` dates are compared. If the value type cannot be determined, the result is FAIL.
+> **Type assertion operators** never coerce values. For `is_integer`, JSON does not distinguish `1` and `1.0`: both parse to the number value `1` and both pass. A value such as `1.5` fails.
+
+Operator packs are ordinary JavaScript objects passed to `createEngine({ operators })`.
+When a caller builds a pack with object spread and the same operator name appears
+more than once, JavaScript's last property wins. Project-local operators may
+therefore override built-ins by being spread after `Operators.check` or
+`Operators.predicate`.
+
+> **`matches_regex`** escaping: before passing `value` to `new RegExp()`, the engine performs one replacement pass over the pattern string: each pair of consecutive backslashes is replaced by one backslash. This supports patterns such as `^\\d{6}$`. This is not iterative unescaping; authors who need regex syntax for a literal backslash must account for JSON string escaping and this single replacement pass.
+
+> **`greater_than`, `less_than`, `field_*_field`**: only finite numbers, numeric strings matching `^[+-]?\d+(\.\d+)?([eE][+-]?\d+)?$`, and strict `YYYY-MM-DD` dates are compared. Calendar-impossible dates such as `2026-02-30` are not dates. If the value type cannot be determined, the result is FAIL.
 
 #### Predicate operators
 
-A subset of check operators. **Not available as predicates:** `any_filled`, `length_equals`, `length_max`.
+A subset of check operators. **Not available as predicates:** `any_filled`, `length_equals`, `length_max`, `not_true`.
 
-Available: `not_empty`, `is_empty`, `equals`, `not_equals`, `contains`, `matches_regex`,
+Available: `not_empty`, `is_empty`, `is_boolean`, `is_string`, `is_number`,
+`is_integer`, `equals`, `not_equals`, `contains`, `matches_regex`,
 `greater_than`, `less_than`, `field_equals_field`, `field_not_equals_field`,
 `field_greater_than_field`, `field_less_than_field`,
 `field_greater_or_equal_than_field`, `field_less_or_equal_than_field`, `in_dictionary`.
@@ -268,7 +284,7 @@ Executes a list of steps (`steps`) only when the `when` expression is truthy.
 
 ### The `when` field
 
-Three allowed forms:
+Four allowed forms:
 
 ```json
 "when": "pred_is_international"
@@ -282,25 +298,41 @@ Three allowed forms:
 "when": { "any": ["pred_a", "pred_b"] }
 ```
 
+```json
+"when": { "not": "pred_a" }
+```
+
 | Form               | Semantics                                                  |
 | ------------------ | ---------------------------------------------------------- |
 | string             | single predicate; condition activates if it returns `TRUE` |
 | `{ "all": [...] }` | all predicates must return `TRUE`                          |
 | `{ "any": [...] }` | at least one predicate must return `TRUE`                  |
+| `{ "not": expr }`  | activates if the nested expression is false                |
 
-`all` and `any` support recursive nesting:
+`all`, `any`, and `not` support recursive nesting:
 
 ```json
 "when": {
   "all": [
     "library.shipping.pred_address_missing",
-    { "any": ["library.order.pred_is_express", "library.order.pred_is_international"] }
+    {
+      "not": {
+        "any": ["library.order.pred_is_express", "library.order.pred_is_international"]
+      }
+    }
   ]
 }
 ```
 
 Each element is a reference to a rule with `role: "predicate"`.
 A reference to a `role: "check"` artifact causes a compilation error.
+
+Predicate operators are three-valued (`TRUE`, `FALSE`, `UNDEFINED`), but a leaf
+predicate with `UNDEFINED` is converted to `FALSE` before the enclosing
+expression is evaluated. Therefore `not` inverts that boolean value: if
+`"when": { "not": "pred_has_field" }` references a predicate whose field is
+absent, the predicate returns `UNDEFINED`, the leaf becomes `FALSE`, `not`
+turns it into `TRUE`, and the condition activates.
 
 ### Scope inference from id
 
@@ -431,13 +463,14 @@ Globally accessible from any rule.
 
 Each element may be:
 
-| Form                      | Comparison              |
-| ------------------------- | ----------------------- |
-| `"string"`                | `value === entry`       |
-| `{ "code": "...", ... }`  | `value === entry.code`  |
-| `{ "value": "...", ... }` | `value === entry.value` |
+| Form                     | Comparison                                      |
+| ------------------------ | ----------------------------------------------- |
+| scalar value             | `value === entry`                               |
+| object with `code`       | `value === entry.code`                          |
+| object with `value`      | `value === entry.value`                         |
+| object with both fields  | `value === entry.code || value === entry.value` |
 
-Comparison is strict (`===`). The type of the payload field value must match the type in `entries`.
+Runtime comparison is strict (`===`) and does not coerce values. Scalar entries may use JSON scalar types such as string, number, or boolean; `null` entries are invalid. The type of the payload field value must match the type in `entries`. Object entries are checked against both `code` and `value` when those fields are present; the object shape does not select only one comparison field. At runtime, an object with neither `code` nor `value` is a non-match. Normative artifacts should still provide at least one of those fields so compiler validation can accept the dictionary.
 
 ### Example
 
@@ -575,7 +608,7 @@ phase only.
 | `actual`     | any            | no             | Actual value of the field in the payload                                                              |
 | `stepId`     | string         | no             | `stepId` from the step, if set                                                                        |
 | `meta`       | object         | no             | `meta` from the rule, or aggregation metadata                                                         |
-| `pipelineId` | string         | no             | Only present for strict escalation issues                                                             |
+| `pipelineId` | string         | yes            | Immediate enclosing pipeline that produced the issue                                                  |
 
 ### Level behaviour at runtime
 
@@ -591,12 +624,16 @@ Already-accumulated issues are preserved in the response.
 
 `validate(artifacts, options)` returns `{ok, diagnostics}` and does not throw for invalid source. Every diagnostic has stable `code`, `level`, `message`, `phase`, `artifactId`, `path`, and `location` fields. Compiler phases construct these fields directly; they are not inferred from message text. `path` identifies the offending property relative to the artifact, while `location` is `file`, `file:line`, or `file:line:column` when supplied through `options.sources`, and `null` otherwise. `compile()` returns an opaque `prepared-jsonspecs` artifact; runtime internals are available only through `inspect()`.
 
-`runPipeline(prepared, {pipelineId?, payload, context?}, options)` accepts only a prepared artifact. If `pipelineId` is omitted, exactly one pipeline must be marked `entrypoint`. Runtime results for a valid prepared artifact always include `status`, `control`, `issues`, and `ruleset`. `ruleset.sourceHash` identifies the compiled artifacts; snapshot builds additionally expose optional `rulesetVersion` and `projectId`. ABORT includes `{code,message,details}`, never a stack. Trace is disabled by default and enabled with `basic` or `verbose`.
+`runPipeline(prepared, {pipelineId?, payload, context?}, options)` accepts only a prepared artifact. If `pipelineId` is omitted, exactly one pipeline must be marked `entrypoint`. `payload` and `context` must be JSON-safe objects. Runtime clones and validates `context` before evaluation; the legacy `payload.__context` source follows the same checks. Runtime results for a valid prepared artifact always include `status`, `control`, `issues`, and `ruleset`. `ruleset.sourceHash` identifies the compiled artifacts; `ruleset.engineVersion` is the version of the loaded jsonspecs engine from its `package.json`; snapshot builds additionally expose optional `rulesetVersion` and `projectId`. ABORT results produced after a prepared artifact is accepted preserve the same `ruleset`. ABORT includes `{code,message,details}`, never a stack. Trace is disabled by default and enabled with `basic` or `verbose`.
 
 An exception thrown by `traceRedactor` is contained and returned as ABORT with `TRACE_REDACTOR_ERROR`; it never escapes `runPipeline`. Unexpected engine faults use the neutral fallback code `RUNTIME_ABORT`.
 
 Trace entries use one structural contract: `{kind:"TRACE",artifactType:"jsonspecs",artifactId,step,at,outcome,details?}`. The normative `step` enum is `pipeline.start`, `pipeline.finish`, `pipeline.abort`, `pipeline.strict`, `rule.start`, `rule.finish`, `condition.evaluate`, `predicate.aggregate`, `check.aggregate`, `context.required`, and `operator.trace`. Basic mode removes runtime values; verbose details pass through `traceRedactor` when provided.
 
 Custom check operators return `OK|FAIL|EXCEPTION`; predicate operators return `TRUE|FALSE|UNDEFINED|EXCEPTION`. `ctx.get(path)` returns `{ok,value}` where `ok` is a boolean property. Any other operator result aborts with `OPERATOR_CONTRACT_VIOLATION`.
+
+When an operator reports `EXCEPTION`, runtime aborts with `OPERATOR_FAULT`. The public error message is generic: `Operator <operator> failed for rule <ruleId>`. `details` contains only `{operator, ruleId}`. The original operator error message and stack are not included in the transport-safe result. Built-in operator `EXCEPTION` results follow the same rule.
+
+Terminology note: `EXCEPTION` has three distinct meanings in v2. A check rule with `level: "EXCEPTION"` creates an issue and stops the flow with result status `EXCEPTION`. An operator result with `status: "EXCEPTION"` is an operator fault and produces ABORT with `OPERATOR_FAULT`. ABORT is the runtime run status for failures that prevent normal rule evaluation from completing.
 
 Normative snapshots have `format: "jsonspecs-snapshot"`, `formatVersion: 1`, canonical `sourceHash`, `engine.minVersion`, `artifacts`, and optional project `meta`. `engine.minVersion` must be a complete SemVer 2.0.0 version; compatibility uses SemVer precedence across major, minor, patch, and prerelease identifiers. They are consumed only through `compileSnapshot()`.

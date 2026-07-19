@@ -58,3 +58,39 @@ test('snapshot schema accepts versioned normative snapshot', () => {
   };
   assert.equal(validateSnapshotSchema(snapshot), true, JSON.stringify(validateSnapshotSchema.errors));
 });
+
+const regexSchemaRule = { id: 'library.regex', type: 'rule', description: 'regex', role: 'check', operator: 'matches_regex', level: 'ERROR', code: 'REGEX', message: 'regex', field: 'value', value: '^x$' };
+
+test('artifact schema accepts allowed matches_regex flags', () => {
+  assert.equal(validateArtifactSchema({ ...regexSchemaRule, flags: 'im' }), true, JSON.stringify(validateArtifactSchema.errors));
+});
+
+test('artifact schema rejects unsupported matches_regex flags', () => {
+  assert.equal(validateArtifactSchema({ ...regexSchemaRule, flags: 'g' }), false);
+});
+
+test('artifact schema rejects repeated matches_regex flags', () => {
+  assert.equal(validateArtifactSchema({ ...regexSchemaRule, flags: 'ii' }), false);
+});
+
+test('artifact schema accepts condition when.not expressions', () => {
+  const artifact = {
+    id: 'library.cond',
+    type: 'condition',
+    description: 'condition',
+    when: { all: ['library.pred_a', { not: { any: ['library.pred_b', { not: 'library.pred_c' }] } }] },
+    steps: [{ rule: 'library.after' }],
+  };
+  assert.equal(validateArtifactSchema(artifact), true, JSON.stringify(validateArtifactSchema.errors));
+});
+
+test('artifact schema rejects condition when.not with an invalid operand', () => {
+  const artifact = {
+    id: 'library.cond',
+    type: 'condition',
+    description: 'condition',
+    when: { not: [] },
+    steps: [{ rule: 'library.after' }],
+  };
+  assert.equal(validateArtifactSchema(artifact), false);
+});

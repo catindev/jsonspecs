@@ -6,6 +6,21 @@ All notable changes to this project will be documented in this file.
 
 - Publish future tagged releases directly under `latest`, removing the obsolete token-based promotion workflow.
 
+## [2.2.0] - 2026-07-19
+
+- Runtime results now include `ruleset.engineVersion` alongside `sourceHash`.
+- Operator `EXCEPTION` results now abort with `OPERATOR_FAULT` and sanitized `{operator, ruleId}` details.
+- Multi-field operator issues now serialize `field: null` when no concrete field exists.
+- Numeric string coercion now accepts only decimal strings matching the documented grammar and rejects hex, whitespace-padded, `Infinity`, `NaN`, dotted-edge, and underscore forms.
+- `matches_regex.flags` is now limited at compile time and in the exported schema to `i`, `m`, and `s` without repeats.
+- `in_dictionary` now matches string, number, and boolean scalar entries by strict equality; `null` dictionary entries now fail validation.
+- Runtime issues now always include `pipelineId` for the immediate enclosing pipeline.
+- Runtime context is now JSON-safe cloned and validated like payload, so cycles, dangerous keys, non-finite numbers, and non-plain values in context abort before evaluation.
+- Added strict type-assertion operators `is_boolean`, `is_string`, `is_number`, and `is_integer` in check and predicate roles.
+- Added the check-only `not_true` operator for absence-tolerant negative flag checks.
+- Added the `{ "not": <expr> }` form for recursive `condition.when` expressions.
+- Documentation now matches runtime behavior for dictionary entry matching, `any_filled.paths`, regex backslash normalization, date comparison failures, public ruleset provenance, and operator fault semantics.
+
 ## [2.1.2] - 2026-07-19
 
 - Reject calendar-impossible `YYYY-MM-DD` values instead of silently normalizing them during date comparisons.

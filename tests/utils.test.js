@@ -43,6 +43,43 @@ describe("utils — strict YYYY-MM-DD parsing", () => {
   });
 });
 
+describe("utils — normative decimal number strings", () => {
+  it("accepts documented decimal forms", () => {
+    const accepted = [
+      ["5", 5],
+      ["-5", -5],
+      ["+5", 5],
+      ["0.5", 0.5],
+      ["1e3", 1000],
+      ["1.5E-2", 0.015],
+      ["007", 7],
+    ];
+
+    for (const [input, value] of accepted) {
+      assert.deepEqual(toComparable(input), { kind: "number", value }, input);
+    }
+  });
+
+  it("rejects strings outside the decimal grammar", () => {
+    const rejected = [
+      "0x1A",
+      " 12 ",
+      "12 ",
+      "Infinity",
+      "-Infinity",
+      "NaN",
+      ".5",
+      "5.",
+      "1_000",
+      "",
+    ];
+
+    for (const input of rejected) {
+      assert.equal(toComparable(input), null, input);
+    }
+  });
+});
+
 describe("utils — deterministic wildcard ordering", () => {
   it("orders wildcard matches and groups identically for non-ASCII keys", () => {
     const keys = ["счета[10]", "счета[2]", "счета[1]"];

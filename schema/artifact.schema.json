@@ -48,6 +48,13 @@
           "properties": {
             "any": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/when" } }
           }
+        },
+        {
+          "type": "object",
+          "required": ["not"],
+          "properties": {
+            "not": { "$ref": "#/$defs/when" }
+          }
         }
       ]
     },
@@ -115,6 +122,14 @@
                       "onEmpty": { "enum": ["TRUE", "FALSE", "UNDEFINED", "ERROR"] }
                     }
                   }
+                }
+              }
+            },
+            {
+              "if": { "properties": { "operator": { "const": "matches_regex" } }, "required": ["operator"] },
+              "then": {
+                "properties": {
+                  "flags": { "type": "string", "pattern": "^(?!.*(.).*\\1)[ims]*$" }
                 }
               }
             }

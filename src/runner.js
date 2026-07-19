@@ -9,7 +9,7 @@ const {
   wildcardGroupBasePattern,
   expandWildcardGroups,
 } = require("./utils");
-const { flattenPayloadSafe, normalizeTransportSafe, hasOwn } = require("./safe-json");
+const { flattenPayloadSafe, cloneContextSafe, normalizeTransportSafe, hasOwn } = require("./safe-json");
 const { getPreparedState } = require("./prepared");
 const { RuntimeError } = require("./compiler/compilation-error");
 
@@ -31,6 +31,16 @@ function compareCount(op, left, right) {
     default:
       throw new Error(`Unsupported COUNT operator: ${op}`);
   }
+}
+
+function traceValue(value) {
+  if (value === undefined) return "";
+  if (value === null) return "null";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") return String(value);
+  if (Array.isArray(value)) return "[array]";
+  if (typeof value === "object") return "[object]";
+  return String(value);
 }
 
 function onEmptyBehavior(rule, defaultBehavior) {
@@ -100,13 +110,17 @@ function checkRequiredContext(pipeline, ctxBase, issues, trace, stepId = null) {
 
 function runPipeline(compiled, pipelineId, payload, options) {
   let provenance = null;
-  let inputContext = null;
+  let inputContext = undefined;
+  let hasInputContext = false;
   if (pipelineId && typeof pipelineId === "object") {
     const input = pipelineId;
     options = payload || {};
     pipelineId = input.pipelineId;
     payload = input.payload;
-    inputContext = input.context || null;
+    if (hasOwn(input, "context")) {
+      inputContext = input.context;
+      hasInputContext = true;
+    }
   }
   options = options || {};
   const traceMode = options.trace === true ? "basic" : (options.trace || false);
@@ -127,7 +141,10 @@ function runPipeline(compiled, pipelineId, payload, options) {
       pipelineId = entrypoints[0].id;
     }
     const flat = flattenPayloadSafe(payload || {});
-    const context = inputContext || (payload && hasOwn(payload, "__context") ? payload.__context : {}) || {};
+    const contextSource = hasInputContext
+      ? inputContext
+      : (payload && hasOwn(payload, "__context") ? payload.__context : undefined);
+    const context = contextSource === undefined ? Object.create(null) : cloneContextSafe(contextSource);
     const enrichedPayload = Object.assign(Object.create(null), flat, { __context: context });
     const payloadKeys = Object.keys(flat);
     const wildcardCache = new Map();
@@ -266,20 +283,20 @@ function execSteps(
         description: rule.description || '',
         field: rule.field || '',
         operator: rule.operator || '',
-        value: rule.value !== undefined ? String(rule.value) : '',
-        actual: actualValue !== undefined ? String(actualValue) : '',
+        value: traceValue(rule.value),
+        actual: traceValue(actualValue),
         meta: rule.meta !== undefined ? rule.meta : null,
       }, rule.id);
 
       if (rule.role === "predicate") {
         const res = evalPredicate(operators, rule, ctxBase, trace, scope);
         t("rule.finish", res.status.toLowerCase(), { ruleId: rule.id, status: res.status }, rule.id);
-        if (res.status === "EXCEPTION") throw res.error;
+        if (res.status === "EXCEPTION") throwEvaluationException(res);
         continue;
       }
 
       const res = evalCheck(operators, rule, ctxBase, trace, scope);
-      if (res.status === "EXCEPTION") throw res.error;
+      if (res.status === "EXCEPTION") throwEvaluationException(res);
 
       // Логируем результат проверки в трейс
       t("rule.finish", res.status.toLowerCase(), {
@@ -295,6 +312,7 @@ function execSteps(
         const fails = Array.isArray(res.failures) ? res.failures : [res];
 
         for (const f of fails) {
+          const issueField = f.field ?? rule.field ?? null;
           const expected = Object.prototype.hasOwnProperty.call(rule, "value")
             ? rule.value
             : Object.prototype.hasOwnProperty.call(rule, "dictionary")
@@ -305,13 +323,14 @@ function execSteps(
             level: rule.level,
             code: rule.code,
             message: rule.message,
-            field: f.field || rule.field,
+            field: issueField,
             ruleId: rule.id,
+            pipelineId: scopePipelineId,
             expected,
             actual: Object.prototype.hasOwnProperty.call(f, "actual")
               ? f.actual
-              : deepGet(ctxBase.payload, f.field || rule.field).ok
-                ? deepGet(ctxBase.payload, f.field || rule.field).value
+              : deepGet(ctxBase.payload, issueField).ok
+                ? deepGet(ctxBase.payload, issueField).value
                 : undefined,
             stepId,
             meta: f.meta || undefined,
@@ -397,6 +416,7 @@ function execSteps(
         ctxBase,
         issues,
         trace,
+        scopePipelineId,
       );
       if (control === "STOP") return "STOP";
       continue;
@@ -409,7 +429,7 @@ function execSteps(
 function evalPredicate(operators, rule, ctxBase, trace, scope) {
   const t = makeTrace(trace, rule.id);
   const rawOp = operators.predicate[rule.operator];
-  const op = (...args) => validateOperatorResult("predicate", rule, rawOp(...args));
+  const op = (...args) => invokeOperator("predicate", rule, rawOp, args);
   try {
     const ctx = Object.assign({}, ctxBase, { trace: (message, details) => t("operator.trace", "info", { message, ...(details || {}) }) });
 
@@ -536,7 +556,7 @@ function evalPredicate(operators, rule, ctxBase, trace, scope) {
 function evalCheck(operators, rule, ctxBase, trace, scope) {
   const t = makeTrace(trace, rule.id);
   const rawOp = operators.check[rule.operator];
-  const op = (...args) => validateOperatorResult("check", rule, rawOp(...args));
+  const op = (...args) => invokeOperator("check", rule, rawOp, args);
   try {
     const ctx = Object.assign({}, ctxBase, { trace: (message, details) => t("operator.trace", "info", { message, ...(details || {}) }) });
 
@@ -845,7 +865,39 @@ function validateOperatorResult(role, rule, result) {
       details: { operator: rule.operator, ruleId: rule.id, returned: normalizeTransportSafe(result) },
     });
   }
+  if (result.status === "EXCEPTION") return operatorFaultResult(rule);
   return result;
+}
+
+function invokeOperator(role, rule, rawOp, args) {
+  let result;
+  try {
+    result = rawOp(...args);
+  } catch (_) {
+    return operatorFaultResult(rule);
+  }
+  return validateOperatorResult(role, rule, result);
+}
+
+function operatorFaultResult(rule) {
+  return { status: "EXCEPTION", error: operatorFaultError(rule) };
+}
+
+function operatorFaultError(rule) {
+  return new RuntimeError({
+    code: "OPERATOR_FAULT",
+    message: `Operator ${rule.operator} failed for rule ${rule.id}`,
+    details: { operator: rule.operator, ruleId: rule.id },
+  });
+}
+
+function throwEvaluationException(result) {
+  if (result && result.error) throw result.error;
+  throw new RuntimeError({
+    code: "RUNTIME_ABORT",
+    message: "Runtime evaluation failed",
+    details: null,
+  });
 }
 
 function evalCondition(
@@ -858,6 +910,7 @@ function evalCondition(
   ctxBase,
   issues,
   trace,
+  scopePipelineId,
 ) {
   const t = makeTrace(trace, condition.id);
   const w = compiledCond.when;
@@ -886,7 +939,7 @@ function evalCondition(
       trace,
       `condition:${condition.id}`,
     );
-    if (r.status === "EXCEPTION") throw r.error;
+    if (r.status === "EXCEPTION") throwEvaluationException(r);
     t("rule.finish", r.status.toLowerCase(), { conditionId: condition.id, ruleId: pr.id }, pr.id);
     return r.status === "TRUE";
   }
@@ -895,6 +948,7 @@ function evalCondition(
     if (expr.mode === "single") return predBool(expr.predId);
     if (expr.mode === "all") return expr.items.every((item) => evalWhen(item));
     if (expr.mode === "any") return expr.items.some((item) => evalWhen(item));
+    if (expr.mode === "not") return !evalWhen(expr.item);
     throw new Error(`Unsupported compiled when mode: ${expr.mode}`);
   }
 
@@ -909,7 +963,7 @@ function evalCondition(
       pipelines,
       conditions,
       compiledCond.steps,
-      compiledCond.scopePipelineId,
+      scopePipelineId,
       ctxBase,
       issues,
       trace,

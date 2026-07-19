@@ -349,6 +349,11 @@ const engine = createEngine({
 });
 ```
 
+Operator packs are ordinary JavaScript objects. If multiple spreads define the
+same operator name, the last property wins; project-local operators may
+intentionally override built-ins by placing them after `...Operators.check` or
+`...Operators.predicate`.
+
 ## Tests
 
 ```bash

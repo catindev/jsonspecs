@@ -35,14 +35,14 @@ function isEmptyValue(v) {
   return v === null || v === undefined || v === "";
 }
 
+const DECIMAL_NUMBER_STRING_RE = /^[+-]?\d+(\.\d+)?([eE][+-]?\d+)?$/;
+
 function toNumber(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (
-    typeof value === "string" &&
-    value.trim() !== "" &&
-    !Number.isNaN(Number(value))
-  )
-    return Number(value);
+  if (typeof value === "string" && DECIMAL_NUMBER_STRING_RE.test(value)) {
+    const number = Number(value);
+    if (Number.isFinite(number)) return number;
+  }
   return null;
 }
 
@@ -73,8 +73,11 @@ function normalizeWhenExpr(when) {
     if (when.any.length === 0) throw new Error(`Invalid condition.when: any[] must be non-empty`);
     return { mode: "any", items: when.any.map(normalizeWhenExpr) };
   }
+  if (isObject(when) && Object.hasOwn(when, "not")) {
+    return { mode: "not", item: normalizeWhenExpr(when.not) };
+  }
   throw new Error(
-    `Invalid condition.when: expected string or nested {all:[..]} or {any:[..]}`,
+    `Invalid condition.when: expected string or nested {all:[..]} or {any:[..]} or {not:...}`,
   );
 }
 
