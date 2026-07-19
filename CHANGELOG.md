@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+- Publish future tagged releases directly under `latest`, removing the obsolete token-based promotion workflow.
+
 ## [2.1.2] - 2026-07-19
 
 - Reject calendar-impossible `YYYY-MM-DD` values instead of silently normalizing them during date comparisons.
