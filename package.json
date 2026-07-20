@@ -1,6 +1,6 @@
 {
-  "name": "jsonspecs",
-  "version": "2.3.4",
+  "name": "@jsonspecs/rules",
+  "version": "2.4.0",
   "description": "Declarative JSON rules engine for validation pipelines",
   "type": "commonjs",
   "main": "index.js",
@@ -41,6 +41,7 @@
     "test:smoke": "node examples/basic/run.js",
     "test:pack": "node scripts/pack-smoke.js",
     "test:perf": "node scripts/perf-smoke.js",
+    "pack:legacy": "node scripts/create-legacy-package.js",
     "prepublishOnly": "npm test && npm run test:pack && npm run test:perf"
   },
   "keywords": [
@@ -61,6 +62,9 @@
     "url": "https://github.com/jsonspecs/rules/issues"
   },
   "homepage": "https://github.com/jsonspecs/rules#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=20"
   },

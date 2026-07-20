@@ -27,14 +27,16 @@ What they cover today:
 
 ## Release publishing
 
-The npm package trusts the GitHub Actions workflow `.github/workflows/release.yml`
+The npm packages trust the GitHub Actions workflow `.github/workflows/release.yml`
 from `jsonspecs/rules` for `npm publish`. The release job runs on a GitHub-hosted
-runner with `id-token: write`, uses Node 24 and npm 11.18.0, publishes directly
-under the `latest` dist-tag, and does not use a long-lived npm token. Trusted
+runner with `id-token: write`, uses Node 24 and npm 11.18.0, publishes
+`@jsonspecs/rules` first and then the `jsonspecs` compatibility package directly
+under the `latest` dist-tag. It does not use a long-lived npm token. Trusted
 publishing generates provenance automatically; `--provenance` is not required.
 
-Configure npm package `jsonspecs` with owner/repo `jsonspecs/rules`, workflow
-filename `release.yml`, allowed action `npm publish`, and no environment.
+Configure npm packages `@jsonspecs/rules` and `jsonspecs` with owner/repo
+`jsonspecs/rules`, workflow filename `release.yml`, allowed action
+`npm publish`, and no environment.
 
 ## Recommended additions
 

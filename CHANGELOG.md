@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-07-21
+
+- Renamed the primary npm package to `@jsonspecs/rules`.
+- Added a `jsonspecs` compatibility package that re-exports `@jsonspecs/rules`.
+- Updated package smoke tests to verify both scoped and compatibility package imports.
+
 ## [2.3.4] - 2026-07-20
 
 - Updated package metadata, badges, and trusted publishing documentation for the `jsonspecs/rules` repository rename.

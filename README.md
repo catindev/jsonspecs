@@ -1,7 +1,7 @@
-# JSONSpecs
+# JSONSpecs Rules
 
 [![CI](https://github.com/jsonspecs/rules/actions/workflows/ci.yml/badge.svg)](https://github.com/jsonspecs/rules/actions)
-[![npm](https://img.shields.io/npm/v/jsonspecs)](https://www.npmjs.com/package/jsonspecs)
+[![npm](https://img.shields.io/npm/v/@jsonspecs/rules)](https://www.npmjs.com/package/@jsonspecs/rules)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node 20+](https://img.shields.io/badge/Node-20%2B-green)](https://nodejs.org/)
 
@@ -12,22 +12,24 @@ Declarative validation engine for JSON rules and deterministic validation pipeli
 Rules are plain JSON artifacts. JSONSpecs validates and prepares them once, runs a named pipeline against a JSON payload, and returns a transport-safe result with stable statuses, issues, diagnostics, optional trace, and ruleset provenance. The package has no runtime dependencies.
 
 ```bash
-npm install jsonspecs
+npm install @jsonspecs/rules
 ```
+
+The legacy `jsonspecs` package remains available as a compatibility package and re-exports the same public API.
 
 Both CommonJS and ESM consumers are supported:
 
 ```js
-const { createEngine, Operators } = require("jsonspecs");
+const { createEngine, Operators } = require("@jsonspecs/rules");
 ```
 
 ```js
-import { createEngine, Operators } from "jsonspecs";
+import { createEngine, Operators } from "@jsonspecs/rules";
 ```
 
 ## Scope of Use
 
-`jsonspecs` can be used as a rules and data-validation engine for credit scoring, lending pipelines, payment gateways, KYC, and other banking processes. Calculation services provide the engine with prepared facts such as amounts, income, debt burden, scoring indicators, balances, limits, fees, currencies, and transaction states. `jsonspecs` applies versioned rules to validate formats, ranges, relationships, and decision conditions, then returns a deterministic result with structured issues and information about the exact rule set and version used. This keeps business rules separate from service code, allows them to be reviewed and tested as independent JSON artifacts, and enables controlled rule updates without moving calculations or state into the rules engine.
+`@jsonspecs/rules` can be used as a rules and data-validation engine for credit scoring, lending pipelines, payment gateways, KYC, and other banking processes. Calculation services provide the engine with prepared facts such as amounts, income, debt burden, scoring indicators, balances, limits, fees, currencies, and transaction states. `@jsonspecs/rules` applies versioned rules to validate formats, ranges, relationships, and decision conditions, then returns a deterministic result with structured issues and information about the exact rule set and version used. This keeps business rules separate from service code, allows them to be reviewed and tested as independent JSON artifacts, and enables controlled rule updates without moving calculations or state into the rules engine.
 
 ## Concepts
 
@@ -45,12 +47,12 @@ The usual production flow is:
 3. prepare or build a deterministic snapshot;
 4. evaluate the prepared artifact with `{ pipelineId, payload, context }`.
 
-`jsonspecs` is loader-agnostic. Filesystem loading, project manifests, Studio UI, and snapshot builds are provided by [`jsonspecs-cli`](https://www.npmjs.com/package/jsonspecs-cli), not by the core engine.
+`@jsonspecs/rules` is loader-agnostic. Filesystem loading, project manifests, Studio UI, and snapshot builds are provided by [`jsonspecs-cli`](https://www.npmjs.com/package/jsonspecs-cli), not by the core engine.
 
 ## Quick start
 
 ```js
-const { createEngine, Operators, formatDiagnostics } = require("jsonspecs");
+const { createEngine, Operators, formatDiagnostics } = require("@jsonspecs/rules");
 
 const artifacts = [
   {
@@ -310,8 +312,8 @@ Regex linting is a heuristic guardrail, not a linear-time guarantee. Rule artifa
 The package exports JSON Schema 2020-12 documents:
 
 ```js
-const artifactSchema = require("jsonspecs/schema");
-const snapshotSchema = require("jsonspecs/schema/snapshot");
+const artifactSchema = require("@jsonspecs/rules/schema");
+const snapshotSchema = require("@jsonspecs/rules/schema/snapshot");
 ```
 
 JSON Schema covers structural validation. Cross-artifact references, operator existence, visibility, uniqueness, aggregate semantics, and pipeline cycles are validated by `validate()` / `compile()`.

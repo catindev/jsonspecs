@@ -1,6 +1,6 @@
 # Справочник операторов
 
-Полный справочник всех встроенных операторов в `jsonspecs`, а также руководство по написанию собственных.
+Полный справочник всех встроенных операторов в `@jsonspecs/rules`, а также руководство по написанию собственных.
 
 ## Встроенные операторы
 
@@ -408,10 +408,10 @@ module.exports = function myOperator(rule, ctx) {
 ### Использование `deepGet`
 
 `ctx.get(path)` — предпочтительный способ прочитать поле из flat payload. `deepGet` сохраняется для обратной совместимости.
-Импортируйте его из `jsonspecs`, если вам явно нужен этот helper:
+Импортируйте его из `@jsonspecs/rules`, если вам явно нужен этот helper:
 
 ```js
-const { deepGet } = require("jsonspecs");
+const { deepGet } = require("@jsonspecs/rules");
 
 function myOperator(rule, ctx) {
   const got = deepGet(ctx.payload, rule.field);
@@ -433,7 +433,7 @@ deepGet(ctx.payload, "$context.currentDate");
 ### Полный пример: дата не должна быть в прошлом
 
 ```js
-const { createEngine, Operators } = require("jsonspecs");
+const { createEngine, Operators } = require("@jsonspecs/rules");
 
 const myOperators = {
   check: {

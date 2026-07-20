@@ -2,7 +2,7 @@
 
 [На русском языке](./OPERATORS_RU.md).
 
-Full reference for all built-in operators in `jsonspecs`, plus a guide for writing your own.
+Full reference for all built-in operators in `@jsonspecs/rules`, plus a guide for writing your own.
 
 ## Built-in operators
 
@@ -413,10 +413,10 @@ Use `ctx.has(path)` when you only need presence/absence.
 
 ### Using `deepGet`
 
-`deepGet` remains available for backward compatibility and advanced use cases. Import it from `jsonspecs` when you explicitly need the helper:
+`deepGet` remains available for backward compatibility and advanced use cases. Import it from `@jsonspecs/rules` when you explicitly need the helper:
 
 ```js
-const { deepGet } = require("jsonspecs");
+const { deepGet } = require("@jsonspecs/rules");
 
 function myOperator(rule, ctx) {
   const got = deepGet(ctx.payload, rule.field);
@@ -438,7 +438,7 @@ deepGet(ctx.payload, "$context.currentDate");
 ### Full example date not in the past
 
 ```js
-const { createEngine, Operators } = require("jsonspecs");
+const { createEngine, Operators } = require("@jsonspecs/rules");
 
 const myOperators = {
   check: {
