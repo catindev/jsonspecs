@@ -4,10 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- Publish future tagged releases directly under `latest`, removing the obsolete token-based promotion workflow.
+## [2.3.2] - 2026-07-20
+
+- Hardened runtime abort serialization so hostile thrown objects, including self-throwing `Proxy` values, cannot escape `runPipeline()`.
+- Contained trace-redactor error inspection when the thrown value is not safely inspectable.
 
 ## [2.3.1] - 2026-07-20
 
+- Publish future tagged releases directly under `latest`, removing the obsolete token-based promotion workflow.
 - Hardened transport normalization with the `"[MaxDepth]"` marker for over-deep values.
 - Added full depth validation for public custom-operator result surfaces.
 - Truncated operator trace details without changing evaluation verdicts.

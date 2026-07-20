@@ -11,6 +11,19 @@ function source(operator = 'not_empty') {
   ];
 }
 
+function selfThrowingProxy() {
+  let proxy;
+  proxy = new Proxy(Object.create(null), {
+    get() {
+      throw proxy;
+    },
+    getPrototypeOf() {
+      throw proxy;
+    },
+  });
+  return proxy;
+}
+
 test('validate returns structured diagnostics without throwing', () => {
   const result = validate([{ id: 'bad', type: 'pipeline', description: 'bad', strict: false, entrypoint: true, flow: [] }]);
   assert.equal(result.ok, false);
@@ -219,6 +232,50 @@ test('throwing options trace getter aborts with provenance and generic error', (
   assert.equal(serialized.includes('boom'), false);
   assert.equal(result.ruleset.sourceHash, computeSourceHash(artifacts));
   assert.equal(result.ruleset.engineVersion, packageVersion);
+});
+
+test('self-throwing proxy input errors stay inside runtime abort boundary', () => {
+  const engine = createEngine({ operators: Operators });
+  const artifacts = source();
+  const prepared = engine.compile(artifacts);
+  const cases = [
+    ['input.pipelineId', () => engine.runPipeline(prepared, {
+      get pipelineId() {
+        throw selfThrowingProxy();
+      },
+      payload: { x: 'ok' },
+    })],
+    ['options.trace new signature', () => engine.runPipeline(prepared, { payload: { x: 'ok' } }, {
+      get trace() {
+        throw selfThrowingProxy();
+      },
+    })],
+    ['options.trace legacy signature', () => engine.runPipeline(prepared, 'entry.main', { x: 'ok' }, {
+      get trace() {
+        throw selfThrowingProxy();
+      },
+    })],
+    ['payload.__context', () => engine.runPipeline(prepared, {
+      payload: {
+        x: 'ok',
+        get __context() {
+          throw selfThrowingProxy();
+        },
+      },
+    })],
+  ];
+
+  for (const [name, run] of cases) {
+    const result = run();
+    const serialized = JSON.stringify(result);
+    assert.equal(result.status, 'ABORT', name);
+    assert.equal(result.control, 'STOP', name);
+    assert.deepEqual(result.error, { code: 'RUNTIME_ABORT', message: 'Runtime aborted', details: null }, name);
+    assert.equal('stack' in result.error, false, name);
+    assert.equal(serialized.includes('getPrototypeOf'), false, name);
+    assert.equal(result.ruleset.sourceHash, computeSourceHash(artifacts), name);
+    assert.equal(result.ruleset.engineVersion, packageVersion, name);
+  }
 });
 
 test('deep payload and context inputs abort with structured depth errors', () => {
@@ -808,6 +865,15 @@ test('throwing trace redactor is contained as coded ABORT', () => {
   assert.equal(result.status, 'ABORT');
   assert.equal(result.control, 'STOP');
   assert.equal(result.error.code, 'TRACE_REDACTOR_ERROR');
+  assert.equal(JSON.stringify(result).includes('secret'), false);
+});
+
+test('self-throwing proxy trace redactor error stays contained', () => {
+  const engine = createEngine({ operators: Operators });
+  const result = engine.runPipeline(engine.compile(source()), { payload: { x: 'secret' } }, { trace: 'verbose', traceRedactor() { throw selfThrowingProxy(); } });
+  assert.equal(result.status, 'ABORT');
+  assert.equal(result.control, 'STOP');
+  assert.deepEqual(result.error, { code: 'TRACE_REDACTOR_ERROR', message: 'Trace redactor failed', details: null });
   assert.equal(JSON.stringify(result).includes('secret'), false);
 });
 

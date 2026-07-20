@@ -52,18 +52,38 @@ function traceValue(value) {
 }
 
 function runtimeAbortPayload(error) {
-  if (error instanceof RuntimeError || error instanceof SafeJsonError) {
+  try {
+    if (!(error instanceof RuntimeError || error instanceof SafeJsonError)) {
+      return genericRuntimeAbortPayload();
+    }
+    const code = error.code;
+    const message = error.message;
+    const details = error.details;
     return {
-      code: error.code || "RUNTIME_ABORT",
-      message: error.message || "Runtime aborted",
-      details: error.details || null,
+      code: typeof code === "string" && code ? code : "RUNTIME_ABORT",
+      message: typeof message === "string" && message ? message : "Runtime aborted",
+      details: details || null,
     };
+  } catch (_) {
+    return genericRuntimeAbortPayload();
   }
+}
+
+function genericRuntimeAbortPayload() {
   return {
     code: "RUNTIME_ABORT",
     message: "Runtime aborted",
     details: null,
   };
+}
+
+function safeErrorMessage(error, fallback) {
+  try {
+    const message = error && error.message;
+    return typeof message === "string" && message ? message : fallback;
+  } catch (_) {
+    return fallback;
+  }
 }
 
 function returnedStatusSummary(result) {
@@ -243,10 +263,12 @@ function runPipeline(compiled, pipelineIdArg, payloadArg, optionsArg) {
     return finishResult({ status, control: ctrl, issues }, traceMode, trace, options, provenance);
   } catch (e) {
     const error = runtimeAbortPayload(e);
-    traceFn("pipeline.abort", "abort", {
-      pipelineId,
-      error: error.code,
-    }, pipelineId);
+    try {
+      traceFn("pipeline.abort", "abort", {
+        pipelineId,
+        error: error.code,
+      }, pipelineId);
+    } catch (_) {}
     return finishResult({
       status: "ABORT",
       control: "STOP",
@@ -265,7 +287,7 @@ function finishResult(result, traceMode, trace, options, provenance) {
       } catch (error) {
         return normalizeTransportSafe(finishAbortResult({
           code: "TRACE_REDACTOR_ERROR",
-          message: error && error.message ? error.message : String(error),
+          message: safeErrorMessage(error, "Trace redactor failed"),
           issues: Array.isArray(result.issues) ? result.issues : [],
           trace,
           traceMode,
@@ -277,7 +299,7 @@ function finishResult(result, traceMode, trace, options, provenance) {
   } catch (error) {
     return normalizeTransportSafe(finishAbortResult({
       code: "RUNTIME_ABORT",
-      message: error && error.message ? error.message : String(error),
+      message: safeErrorMessage(error, "Runtime aborted"),
       issues: [],
       trace,
       traceMode,
