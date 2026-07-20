@@ -1,6 +1,6 @@
 {
   "name": "jsonspecs",
-  "version": "2.3.2",
+  "version": "2.3.3",
   "description": "Declarative JSON rules engine for validation pipelines",
   "type": "commonjs",
   "main": "index.js",
@@ -55,12 +55,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/catindev/jsonspecs.git"
+    "url": "git+https://github.com/jsonspecs/core.git"
   },
   "bugs": {
-    "url": "https://github.com/catindev/jsonspecs/issues"
+    "url": "https://github.com/jsonspecs/core/issues"
   },
-  "homepage": "https://github.com/catindev/jsonspecs#readme",
+  "homepage": "https://github.com/jsonspecs/core#readme",
   "engines": {
     "node": ">=20"
   },
