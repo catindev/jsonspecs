@@ -146,7 +146,7 @@ descriptions and authoring metadata are builder/CLI concerns.
 
 The runtime is suitable for deterministic validation and business-rule decisions in credit workflows and payment gateways: required data, eligibility, consistency, limits expressed by operators, routing conditions, sanctions flags, and ordered business diagnostics. Services remain responsible for transport byte limits, authentication, authorization, snapshot delivery, and deployment provenance of external operator packs.
 
-See the [behavior specification](https://github.com/jsonspecs/spec/blob/d75024047437ce0119a28c6ceda818eb79c4f302/SPEC.md),
+See the [behavior specification](https://github.com/jsonspecs/spec/blob/25766710aa0f1fdf33354fa453003f7d819b93d6/SPEC.md),
 [engine implementation](IMPLEMENTATION.md), [operators](OPERATORS.md),
 [RC.6 migration guide](MIGRATION_RC6.md), [2.x to 3.x migration](MIGRATION_V3.md),
 and [testing](TESTING.md).

@@ -5,11 +5,11 @@
 - Source repository: `jsonspecs/rules`
 - Base commit: `4b4d6fe42e9972e730648f71a6db49b733f201bf`
 - Target specification: `jsonspecs/spec` 1.0.0-rc.6
-- Specification commit: `d75024047437ce0119a28c6ceda818eb79c4f302`
+- Specification commit: `25766710aa0f1fdf33354fa453003f7d819b93d6`
 
 The specification and technical brief agree on the release boundary: RC.6 changes
 only wildcard population construction and keeps the DSL and operator boundary closed.
-All 308 normative fixtures pass. `any_filled.fields[]` still rejects wildcard paths
+All 309 normative fixtures pass. `any_filled.fields[]` still rejects wildcard paths
 because aggregation is defined only for the primary `field` operand.
 
 ## Architecture
@@ -27,11 +27,11 @@ comments inside the code explain ordering, portability and security invariants.
 
 ## Verification
 
-- 23 package and hostile-JS regression tests include RC.5 rejection, structural absent
-  paths, immutable built-ins,
+- 24 package and hostile-JS regression tests include RC.5 rejection, structural absent
+  paths, exact large-index preservation, immutable built-ins,
   self-throwing proxies, cyclic host values, huge sparse arrays, shared references
   and a 10,000-pipeline graph.
-- 308/308 normative conformance fixtures on Node.js 20, 22 and 24.
+- 309/309 normative conformance fixtures on Node.js 20, 22 and 24.
 - README smoke, package-install smoke for CJS/ESM, and performance smoke pass.
 - `npm ci` and full `prepublishOnly` pass from the lockfile.
 - `npm audit --omit=dev`: 0 vulnerabilities.

@@ -4,7 +4,7 @@ This document describes the Node.js implementation in `@jsonspecs/rules`. It is
 not a copy of the behavioral contract and does not redefine it.
 
 Normative behavior is defined by
-[`jsonspecs/spec` 1.0.0-rc.6](https://github.com/jsonspecs/spec/blob/d75024047437ce0119a28c6ceda818eb79c4f302/SPEC.md).
+[`jsonspecs/spec` 1.0.0-rc.6](https://github.com/jsonspecs/spec/blob/25766710aa0f1fdf33354fa453003f7d819b93d6/SPEC.md).
 The exact source commit used by the test suite is stored in
 `tests/conformance/spec-commit.txt`.
 

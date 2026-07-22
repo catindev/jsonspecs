@@ -35,9 +35,11 @@ function parsePath(value, options) {
     while (source[position] === "[") {
       const close = source.indexOf("]", position + 1);
       const raw = source.slice(position + 1, close);
+      // Исходный текст индекса нужен для точного concrete path: binary64-число
+      // может округлить допустимый DSL-индекс ещё до структурного обхода.
       tokens.push(Object.freeze(raw === "*"
         ? { type: "wildcard" }
-        : { type: "index", value: Number(raw) }));
+        : { type: "index", raw, value: Number(raw) }));
       position = close + 1;
     }
     if (source[position] === ".") position++;

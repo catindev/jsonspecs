@@ -45,7 +45,7 @@ function expandWildcard(root, plan) {
 function advanceExact(branch, token) {
   const path = token.type === "key"
     ? (branch.path ? `${branch.path}.${token.value}` : token.value)
-    : `${branch.path}[${token.value}]`;
+    : `${branch.path}[${token.raw}]`;
   if (!branch.reachable) return { node: undefined, path, reachable: false };
 
   if (token.type === "key") {
@@ -56,7 +56,11 @@ function advanceExact(branch, token) {
     return { node: branch.node[token.value], path, reachable: true };
   }
 
-  if (!Array.isArray(branch.node) || token.value >= branch.node.length) {
+  // Небезопасное целое не может быть индексом JSON-массива, но его исходный
+  // текст остаётся частью синтезированного отсутствующего concrete path.
+  if (!Array.isArray(branch.node)
+    || !Number.isSafeInteger(token.value)
+    || token.value >= branch.node.length) {
     return { node: undefined, path, reachable: false };
   }
   return { node: branch.node[token.value], path, reachable: true };

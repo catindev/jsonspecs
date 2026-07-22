@@ -40,5 +40,5 @@ RC.5 выбирал существующие конечные пути из пл
 коллекции оставьте в отдельном существующем бизнес-правиле.
 
 Полное поведение задано в закреплённой
-[спецификации RC.6](https://github.com/jsonspecs/spec/blob/d75024047437ce0119a28c6ceda818eb79c4f302/SPEC_RU.md)
-и её [руководстве по переходу](https://github.com/jsonspecs/spec/blob/d75024047437ce0119a28c6ceda818eb79c4f302/MIGRATION_RC6_RU.md).
+[спецификации RC.6](https://github.com/jsonspecs/spec/blob/25766710aa0f1fdf33354fa453003f7d819b93d6/SPEC_RU.md)
+и её [руководстве по переходу](https://github.com/jsonspecs/spec/blob/25766710aa0f1fdf33354fa453003f7d819b93d6/MIGRATION_RC6_RU.md).

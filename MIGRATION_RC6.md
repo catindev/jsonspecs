@@ -38,5 +38,5 @@ field for every existing item. Keep collection-emptiness checks in their existin
 business rule.
 
 The complete behavior is defined by the pinned
-[RC.6 specification](https://github.com/jsonspecs/spec/blob/d75024047437ce0119a28c6ceda818eb79c4f302/SPEC.md)
-and its [migration guide](https://github.com/jsonspecs/spec/blob/d75024047437ce0119a28c6ceda818eb79c4f302/MIGRATION_RC6.md).
+[RC.6 specification](https://github.com/jsonspecs/spec/blob/25766710aa0f1fdf33354fa453003f7d819b93d6/SPEC.md)
+and its [migration guide](https://github.com/jsonspecs/spec/blob/25766710aa0f1fdf33354fa453003f7d819b93d6/MIGRATION_RC6.md).

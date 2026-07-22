@@ -15,12 +15,14 @@ All notable changes to this project will be documented in this file.
   unavailable to operators, and exact `$context` paths separate from wildcard fields.
 - Pre-parse wildcard paths into immutable tokens during compilation and execute their
   numeric odometer traversal in a dedicated runtime module.
+- Preserve the exact decimal spelling of exact index tokens in synthesized wildcard
+  issue paths, including indices outside the binary64 safe-integer range.
 - Preserve exhaustive ALL/ANY/COUNT evaluation, all-`SKIP` behavior, `onEmpty`, and
   aggregate counters over the RC.6 structural population.
 - Reject RC.5 snapshots with `UNSUPPORTED_SPEC_VERSION` and provide an RC.6 migration
   guide without a compatibility profile.
-- Vendor and pass all 308 normative conformance fixtures from spec commit
-  `d75024047437ce0119a28c6ceda818eb79c4f302`.
+- Vendor and pass all 309 normative conformance fixtures from spec commit
+  `25766710aa0f1fdf33354fa453003f7d819b93d6`.
 
 ## [3.0.0] - 2026-07-22
 
