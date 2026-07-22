@@ -14,7 +14,8 @@ Ordered comparison: `greater_than`, `less_than`, `field_equals_field`,
 Patterns and dictionaries: `matches_regex`, `not_matches_regex`, `in_dictionary`,
 `not_in_dictionary`.
 
-Exact operand schemas and semantics are normative in `SPEC.md` §3.
+Exact operand schemas and semantics are normative in the
+[`jsonspecs/spec` operator section](https://github.com/jsonspecs/spec/blob/d7f07976b0fe004584217adf079c57caec102ab3/SPEC.md#3-operators).
 
 ## External definition
 
@@ -28,7 +29,9 @@ interface OperatorDefinition {
 `schema` validates a closed object containing only the configured operator operands:
 `field`, `value`, `value_field`, `dictionary`, `inputs`, or `params`. `fields` is
 reserved for built-in `any_filled`. The engine separately validates every path and
-resolves it before invocation.
+resolves it before invocation. The schema must enumerate a finite set of property
+names at the configuration, `inputs`, and immediate `params` levels;
+`patternProperties` is rejected there.
 
 Invocation keys hold values, not authored paths. A missing configured `field` or
 `value_field` produces core-level `SKIP` without calling a value operator. A missing
@@ -37,7 +40,8 @@ member with value `null`.
 
 Operator functions must be synchronous and deterministic. They must not read time,
 locale, network, process globals, or mutate inputs. Cross-runtime operator packs
-publish equivalent schemas and shared golden vectors as required by `SPEC.md` §7.1.
+publish equivalent schemas and shared golden vectors as defined by the
+[behavior specification](https://github.com/jsonspecs/spec/blob/d7f07976b0fe004584217adf079c57caec102ab3/SPEC.md).
 
 `builtInOperators` exposes deeply frozen definitions for inspection. Neither their
 schemas nor nested schema members can be changed by consumers.

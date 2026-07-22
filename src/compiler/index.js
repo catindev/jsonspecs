@@ -12,7 +12,7 @@ const { prepareSnapshot } = require("./snapshot");
 const { validateArtifacts } = require("./artifacts");
 const { validateReferences } = require("./references");
 const { createPrepared } = require("../prepared");
-const { reject, CompilationError } = require("../errors");
+const { reject, CompilationError, isCompilationError, safeErrorString } = require("../errors");
 const { parseIJson } = require("../json/i-json");
 
 function compileSnapshot(input, environment) {
@@ -41,7 +41,12 @@ function compileSnapshot(input, environment) {
 function compileSnapshotText(text, environment) {
   let parsed;
   try { parsed = parseIJson(text); }
-  catch (error) { throw new CompilationError([{ code: error.code || "INVALID_IJSON", message: error.message }]); }
+  catch (error) {
+    throw new CompilationError([{
+      code: safeErrorString(error, "code", "INVALID_IJSON"),
+      message: safeErrorString(error, "message", "Snapshot text is not valid I-JSON"),
+    }]);
+  }
   return compileSnapshot(parsed, environment);
 }
 
@@ -50,7 +55,7 @@ function validateSnapshot(input, environment) {
     const prepared = compileSnapshot(input, environment);
     return { ok: true, diagnostics: [], prepared };
   } catch (error) {
-    if (error instanceof CompilationError) return { ok: false, diagnostics: error.diagnostics, ...(error.identifier ? { identifier: error.identifier } : {}) };
+    if (isCompilationError(error)) return { ok: false, diagnostics: error.diagnostics, ...(error.identifier ? { identifier: error.identifier } : {}) };
     throw error;
   }
 }

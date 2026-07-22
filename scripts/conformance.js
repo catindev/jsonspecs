@@ -58,11 +58,11 @@ for (const file of files) {
         else engine.compileSnapshot(fixture.snapshot);
       } catch (caught) { error = caught; }
       assert(error instanceof CompilationError, "snapshot was accepted");
-      if (fixture.expected.identifier) assert.equal(error.identifier, fixture.expected.identifier);
+      assert.equal(error.identifier, fixture.expected.identifier);
     } else {
       const prepared = engine.compileSnapshot(fixture.snapshot);
       const actual = engine.runPipeline(prepared, fixture.input);
-      assert.deepStrictEqual(actual, fixture.expected);
+      assert.deepStrictEqual(jsonModel(actual), jsonModel(fixture.expected));
     }
     passed++;
   } catch (error) {
@@ -93,4 +93,24 @@ function pathSchema() { return { type: "string", minLength: 1 }; }
 function emptySchema() { return configSchema({}, []); }
 function configSchema(properties, required) {
   return { type: "object", properties, required, additionalProperties: false };
+}
+
+function jsonModel(value, active = new WeakSet()) {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    assert(Number.isFinite(value), "result contains a non-finite number");
+    return Object.is(value, -0) ? 0 : value;
+  }
+  assert(value && typeof value === "object", `result contains non-JSON value ${typeof value}`);
+  assert(!active.has(value), "result contains a cycle");
+  active.add(value);
+  if (Array.isArray(value)) {
+    const out = value.map((item) => jsonModel(item, active));
+    active.delete(value);
+    return out;
+  }
+  const out = {};
+  for (const key of Object.keys(value)) out[key] = jsonModel(value[key], active);
+  active.delete(value);
+  return out;
 }

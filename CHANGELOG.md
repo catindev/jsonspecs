@@ -14,8 +14,13 @@
 - Reject cyclic host values and huge sparse arrays without blocking evaluation.
 - Replace recursive control-flow traversal and execution with explicit stacks so valid
   deep graphs do not depend on the Node.js call-stack limit.
-- Vendor and pass all 267 normative conformance fixtures from spec commit
-  `0dbd42533f46541c69dcb17eb52bd2fdae9e8a42`.
+- Contain self-throwing `Proxy` values through private `WeakSet` abort markers and
+  preserve `INVALID_PAYLOAD` versus `INVALID_CONTEXT` classification.
+- Enforce portable regex expansion limits and finite external-operator contracts.
+- Validate and index dictionaries in linear time for constant-time built-in lookup.
+- Vendor and pass all 276 normative conformance fixtures from spec commit
+  `d7f07976b0fe004584217adf079c57caec102ab3`; CI verifies the source tree before
+  running it and compares results through the JSON data model.
 - Remove legacy `role`, `strict`, `control`, trace-in-result, `payload.__context`,
   `required_context`, object steps and formatVersion 1 compilation.
 

@@ -10,7 +10,7 @@
 
 const { cloneIJson, isPlainObject, deepFreeze } = require("../json/i-json");
 const { computeSourceHash, compareUtf16 } = require("../json/jcs");
-const { reject } = require("../errors");
+const { reject, safeErrorString } = require("../errors");
 
 const SUPPORTED_SPEC_VERSIONS = Object.freeze(["1.0.0-rc.5"]);
 const SNAPSHOT_KEYS = new Set(["format", "formatVersion", "specVersion", "sourceHash", "exports", "artifacts"]);
@@ -18,7 +18,12 @@ const SNAPSHOT_KEYS = new Set(["format", "formatVersion", "specVersion", "source
 function prepareSnapshot(input) {
   let snapshot;
   try { snapshot = cloneIJson(input); }
-  catch (error) { reject(error.code || "INVALID_SNAPSHOT", error.message); }
+  catch (error) {
+    reject(
+      safeErrorString(error, "code", "INVALID_SNAPSHOT"),
+      safeErrorString(error, "message", "Snapshot is not valid I-JSON"),
+    );
+  }
   if (!isPlainObject(snapshot)) reject("INVALID_SNAPSHOT", "Snapshot must be an object");
   for (const key of Object.keys(snapshot)) if (!SNAPSHOT_KEYS.has(key)) reject("UNKNOWN_SNAPSHOT_FIELD", `Unknown snapshot field ${key}`, { path: key });
   if (snapshot.format !== "jsonspecs-snapshot" || snapshot.formatVersion !== 2)

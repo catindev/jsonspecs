@@ -61,4 +61,25 @@ runCase("459-rule compile and 20 runs", 3000, () => {
   for (let i = 0; i < 20; i++) if (engine.runPipeline(prepared, { pipelineId: "p", payload }).status !== "OK") throw new Error("unexpected status");
 });
 
+const dictionaryEntries = Array.from({ length: 20000 }, (_, index) => `value-${index}`);
+const dictionarySnapshot = snapshot({
+  p: { type: "pipeline", steps: ["r"] },
+  r: {
+    type: "rule", operator: "in_dictionary", field: "x", dictionary: "d",
+    issue: { level: "ERROR", code: "D", message: "not found" },
+  },
+  d: { type: "dictionary", entries: dictionaryEntries },
+}, ["p"]);
+let largeDictionary;
+runCase("dictionary 20000 entries compile", 1000, () => {
+  largeDictionary = engine.compileSnapshot(dictionarySnapshot);
+});
+
+runCase("dictionary 5000 indexed misses", 1000, () => {
+  for (let index = 0; index < 5000; index++) {
+    const result = engine.runPipeline(largeDictionary, { pipelineId: "p", payload: { x: `missing-${index}` } });
+    if (result.status !== "ERROR") throw new Error("unexpected status");
+  }
+});
+
 console.log("jsonspecs perf smoke OK");

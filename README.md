@@ -1,11 +1,15 @@
-# @jsonspecs/rules
+# JSONSpecs Rules
 
-Deterministic JSON rules runtime for Node.js. Version 3 implements the executable
-contract of `jsonspecs/spec` **1.0.0-rc.5** and runs its 267 normative fixtures.
+[![CI](https://github.com/jsonspecs/rules/actions/workflows/ci.yml/badge.svg)](https://github.com/jsonspecs/rules/actions)
+[![npm](https://img.shields.io/npm/v/@jsonspecs/rules)](https://www.npmjs.com/package/@jsonspecs/rules)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Node 20+](https://img.shields.io/badge/Node-20%2B-green)](https://nodejs.org/)
 
-The engine validates a closed snapshot once, verifies its JCS `sourceHash`, binds
-built-in and external operators, and returns a deterministic result with ordered
-business issues and ruleset provenance.
+[`На русском языке`](README_RU.md)
+
+Deterministic JSON rules runtime for Node.js. Version 3 implements the executable contract of `jsonspecs/spec` **1.0.0-rc.5**.
+
+The engine validates a closed snapshot once, verifies its JCS `sourceHash`, binds built-in and external operators, and returns a deterministic result with ordered business issues and ruleset provenance.
 
 ## Install
 
@@ -96,7 +100,9 @@ const engine = createEngine({
       },
       evaluate({ inputs, params }) {
         if (!("age" in inputs)) return "SKIP";
-        return Number.isInteger(inputs.age) && inputs.age >= params.minimum ? "PASS" : "FAIL";
+        return Number.isInteger(inputs.age) && inputs.age >= params.minimum
+          ? "PASS"
+          : "FAIL";
       },
     },
   },
@@ -126,14 +132,8 @@ descriptions and authoring metadata are builder/CLI concerns.
 
 ## Banking use
 
-The runtime is suitable for deterministic validation and business-rule decisions in
-credit workflows and payment gateways: required data, eligibility, consistency,
-limits expressed by operators, routing conditions, sanctions flags, and ordered
-business diagnostics. Amount arithmetic and domain calculations belong in dedicated
-decimal/operator packages; this module orchestrates their boolean outcomes and audit
-facts. Services remain responsible for transport byte limits, authentication,
-authorization, snapshot delivery, and deployment provenance of external operator
-packs.
+The runtime is suitable for deterministic validation and business-rule decisions in credit workflows and payment gateways: required data, eligibility, consistency, limits expressed by operators, routing conditions, sanctions flags, and ordered business diagnostics. Services remain responsible for transport byte limits, authentication, authorization, snapshot delivery, and deployment provenance of external operator packs.
 
-See [SPEC.md](SPEC.md), [OPERATORS.md](OPERATORS.md),
-[MIGRATION_V3.md](MIGRATION_V3.md), and [TESTING.md](TESTING.md).
+See the [behavior specification](https://github.com/jsonspecs/spec/blob/d7f07976b0fe004584217adf079c57caec102ab3/SPEC.md),
+[engine implementation](IMPLEMENTATION.md), [operators](OPERATORS.md),
+[migration guide](MIGRATION_V3.md), and [testing](TESTING.md).

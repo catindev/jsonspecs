@@ -1,6 +1,6 @@
 export type OperatorOutcome = "PASS" | "FAIL" | "SKIP";
 export interface OperatorDefinition {
-  /** Closed JSON Schema (draft-07) for field/fields/value/value_field/dictionary/inputs/params. */
+  /** Closed JSON Schema (draft-07) with finite explicit names for configuration, inputs, and immediate params. */
   readonly schema: Readonly<Record<string, unknown>>;
   readonly evaluate: (invocation: Readonly<Record<string, unknown>>) => OperatorOutcome;
 }

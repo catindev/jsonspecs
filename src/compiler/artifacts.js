@@ -11,8 +11,8 @@
 
 const { reject } = require("../errors");
 const { compileRegex } = require("../regex");
-const { scalarEquals } = require("../operators/comparison");
 const { BUILT_IN_NAMES } = require("../operators/builtins");
+const { indexDictionary } = require("../operators/dictionary-index");
 const { isPath, hasWildcard } = require("./paths");
 const { operatorConfig, formatAjvErrors } = require("./contracts");
 
@@ -127,12 +127,9 @@ function validatePipeline(id, artifact) {
 function validateDictionary(id, artifact) {
   closed(id, artifact, new Set(["type", "entries"]));
   if (!Array.isArray(artifact.entries) || !artifact.entries.length) reject("INVALID_DICTIONARY", `Dictionary ${id} needs entries`, { artifactId: id });
-  const seen = [];
-  for (const entry of artifact.entries) {
-    if (!["string", "number", "boolean"].includes(typeof entry)) reject("INVALID_DICTIONARY", `Dictionary ${id} entries must be non-null scalars`, { artifactId: id });
-    if (seen.some((value) => scalarEquals(value, entry))) reject("INVALID_DICTIONARY", `Dictionary ${id} has duplicate entry`, { artifactId: id });
-    seen.push(entry);
-  }
+  const problem = indexDictionary(artifact.entries);
+  if (problem === "invalid") reject("INVALID_DICTIONARY", `Dictionary ${id} entries must be non-null scalars`, { artifactId: id });
+  if (problem === "duplicate") reject("INVALID_DICTIONARY", `Dictionary ${id} has duplicate entry`, { artifactId: id });
 }
 
 function validateSteps(id, steps) {

@@ -11,6 +11,8 @@
 
 const MAX_PATTERN_CODE_POINTS = 1024;
 const MAX_QUANTIFIER = 1000;
+const MAX_NESTED_REPEAT_FACTOR = 1000;
+const MAX_EXPANDED_ATOMS = 10000;
 const SCALARS = [[0, 0xd7ff], [0xe000, 0x10ffff]];
 
 function parsePattern(source) {
@@ -76,11 +78,12 @@ function parsePattern(source) {
       if (peek() === "-") {
         at++;
         if (peek() === "]" || peek() == null) throw syntax("Unescaped '-' must form a range", at - 1);
-        const right = classAtom(true);
-        if (left.length !== 1 || right.length !== 1) throw syntax("Character-class ranges require scalar endpoints", at);
-        if (left[0][0] > right[0][0]) throw syntax("Character-class range is reversed", at);
-        ranges.push([left[0][0], right[0][0]]);
-      } else ranges.push(...left);
+        const right = classAtom();
+        if (left.classEscape || right.classEscape) throw syntax("Class escape cannot be a range endpoint", at);
+        if (left.ranges.length !== 1 || right.ranges.length !== 1) throw syntax("Character-class ranges require scalar endpoints", at);
+        if (left.ranges[0][0] > right.ranges[0][0]) throw syntax("Character-class range is reversed", at);
+        ranges.push([left.ranges[0][0], right.ranges[0][0]]);
+      } else ranges.push(...left.ranges);
     }
     if (!count || peek() !== "]") throw syntax("Empty or unclosed character class", at);
     at++;
@@ -88,16 +91,15 @@ function parsePattern(source) {
     return { type: "class", ranges: negate ? complement(merged) : merged };
   }
 
-  function classAtom(rangeEndpoint = false) {
+  function classAtom() {
     if (peek() === "-") throw syntax("Literal '-' must be escaped in a class", at);
     if (peek() === "\\") {
       const node = escaped(true);
-      if (rangeEndpoint && node.ranges.length !== 1) throw syntax("Class escape cannot be a range endpoint", at);
-      return node.ranges;
+      return { ranges: node.ranges, classEscape: node.classEscape === true };
     }
     const item = take();
     if (!item || item.char === "]") throw syntax("Expected class atom", at);
-    return [[item.cp, item.cp]];
+    return { ranges: [[item.cp, item.cp]], classEscape: false };
   }
 
   function escaped(inClass) {
@@ -114,7 +116,7 @@ function parsePattern(source) {
     const lower = item.char.toLowerCase();
     if (classes[lower]) {
       const ranges = item.char === lower ? merge(classes[lower]) : complement(merge(classes[lower]));
-      return inClass ? classNode(ranges) : { type: "class", ranges };
+      return inClass ? classNode(ranges, true) : { type: "class", ranges };
     }
     const escapedMeta = "\\.*+?()[]{}|^$/-";
     if (escapedMeta.includes(item.char)) return inClass ? classNode([[item.cp, item.cp]]) : { type: "literal", cp: item.cp };
@@ -123,7 +125,10 @@ function parsePattern(source) {
 
   function readQuantifier() {
     const ch = peek();
-    if (ch === "*" || ch === "+" || ch === "?") { at++; return ch; }
+    if (ch === "*" || ch === "+" || ch === "?") {
+      at++;
+      return { source: ch, factor: 1, copies: 1, offset: at - 1 };
+    }
     if (ch !== "{") return null;
     const start = at++;
     const min = integer();
@@ -137,22 +142,69 @@ function parsePattern(source) {
     if (min > MAX_QUANTIFIER || (max != null && max > MAX_QUANTIFIER)) throw syntax("Quantifier exceeds 1000", start);
     if (max != null && min > max) throw syntax("Quantifier minimum exceeds maximum", start);
     if (peek() === "?" || peek() === "+") throw syntax("Lazy and possessive quantifiers are forbidden", at);
-    return max === min ? `{${min}}` : max == null ? `{${min},}` : `{${min},${max}}`;
+    const upper = max == null ? min : max;
+    return {
+      source: max === min ? `{${min}}` : max == null ? `{${min},}` : `{${min},${max}}`,
+      factor: Math.max(upper, 1),
+      copies: max == null ? min + 1 : Math.max(max, 1),
+      offset: start,
+    };
   }
 
   function integer() {
     const start = at;
     while (/[0-9]/.test(peek() || "")) at++;
     if (start === at) throw syntax("Expected integer", at);
+    if (source[start] === "0" && at - start > 1) throw syntax("Integer must not contain a leading zero", start);
     return Number(source.slice(start, at));
   }
 
   const ast = alternation();
   if (at !== source.length) throw syntax(`Unexpected token ${peek()}`, at);
+  assertPortableLimits(ast);
   return ast;
 }
 
-function classNode(ranges) { return { type: "class", ranges }; }
+function classNode(ranges, classEscape = false) { return { type: "class", ranges, classEscape }; }
+
+function assertPortableLimits(ast) {
+  function count(node, enclosingFactor) {
+    switch (node.type) {
+      case "literal":
+      case "class":
+        return 1;
+      case "anchor":
+        return 0;
+      case "group":
+        return count(node.body, enclosingFactor);
+      case "concat":
+        return sum(node.elements, enclosingFactor);
+      case "alt":
+        return sum(node.branches, enclosingFactor);
+      case "quantified": {
+        if (node.quantifier.factor > Math.floor(MAX_NESTED_REPEAT_FACTOR / enclosingFactor))
+          throw syntax("Nested counted-repeat factor exceeds 1000", node.quantifier.offset);
+        const inner = count(node.atom, enclosingFactor * node.quantifier.factor);
+        if (inner > Math.floor(MAX_EXPANDED_ATOMS / node.quantifier.copies))
+          throw syntax("Expanded atom count exceeds 10000", node.quantifier.offset);
+        return inner * node.quantifier.copies;
+      }
+      default:
+        throw new TypeError(`Unknown regex AST node ${node.type}`);
+    }
+  }
+
+  function sum(nodes, enclosingFactor) {
+    let total = 0;
+    for (const node of nodes) {
+      total += count(node, enclosingFactor);
+      if (total > MAX_EXPANDED_ATOMS) throw syntax("Expanded atom count exceeds 10000", 0);
+    }
+    return total;
+  }
+
+  count(ast, 1);
+}
 
 function merge(input) {
   const sorted = input.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);

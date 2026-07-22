@@ -2,8 +2,10 @@
 
 `@jsonspecs/rules` 3.0.0 implements `jsonspecs/spec` 1.0.0-rc.5 and accepts only
 snapshot `formatVersion: 2`. The normative behavior is the projection defined by
-the bundled `SPEC.md`; the vendored 267-fixture suite is pinned to spec commit
-`0dbd42533f46541c69dcb17eb52bd2fdae9e8a42`.
+the [upstream specification](https://github.com/jsonspecs/spec/blob/d7f07976b0fe004584217adf079c57caec102ab3/SPEC.md).
+The vendored 276-fixture suite is pinned to spec commit
+`d7f07976b0fe004584217adf079c57caec102ab3` and is compared byte for byte with a
+checkout of that commit before execution.
 
 The semver-stable package-root API is `createEngine`, `builtInOperators`,
 `CompilationError`, `compileSnapshot`, `compileSnapshotText`, `validate`,
@@ -20,5 +22,5 @@ be changed to alter validation performed by engines created later in the same pr
 
 External operators use the synchronous `{schema,evaluate}` boundary documented in
 `OPERATORS.md`. Changing invocation presence semantics, the outcome enum, operator
-schema handling, result fields, accepted snapshot set, or any normative SPEC behavior
-is a breaking change.
+schema handling, result fields, accepted snapshot set, or any normative specification
+behavior is a breaking change.

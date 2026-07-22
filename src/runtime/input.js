@@ -9,22 +9,22 @@
  * и только после этого создаётся отделённый I-JSON клон.
  */
 
-const { RuntimeAbort } = require("../errors");
+const { RuntimeAbort, isRuntimeAbort } = require("../errors");
 const { cloneIJson, isPlainObject, assertScalarString, deepFreeze } = require("../json/i-json");
 const { compareCodePoints } = require("../json/jcs");
 
 const DANGEROUS = new Set(["__proto__", "prototype", "constructor"]);
 
 function validateEvaluationInput(state, input) {
-  const pipelineId = input?.pipelineId;
+  const pipelineId = readMember(input, "pipelineId", "INVALID_PIPELINE_ID", { expected: "non-empty string" });
   if (typeof pipelineId !== "string" || !pipelineId || !isScalarString(pipelineId))
     abort("INVALID_PIPELINE_ID", { expected: "non-empty string" });
   if (!state.exports.has(pipelineId)) abort("PIPELINE_NOT_FOUND", { pipelineId });
 
-  const payload = input?.payload;
-  const context = input && Object.prototype.hasOwnProperty.call(input, "context") ? input.context : {};
-  if (!isPlainObject(payload)) abort("INVALID_PAYLOAD", { expected: "object" });
-  if (!isPlainObject(context)) abort("INVALID_CONTEXT", { expected: "object" });
+  const payload = readMember(input, "payload", "INVALID_PAYLOAD", { expected: "object" });
+  const context = hasMember(input, "context", "INVALID_CONTEXT")
+    ? readMember(input, "context", "INVALID_CONTEXT", { expected: "object" })
+    : {};
 
   // Циклы, разреженные массивы и объекты среды выполнения не входят в I-JSON.
   // Проверяем их отдельным итеративным проходом, чтобы последующие нормативные
@@ -32,24 +32,24 @@ function validateEvaluationInput(state, input) {
   assertHostJsonTree(payload, "INVALID_PAYLOAD");
   assertHostJsonTree(context, "INVALID_CONTEXT");
 
-  const payloadKeys = scanKeys(payload);
-  const contextKeys = scanKeys(context);
+  const payloadKeys = guardInput("INVALID_PAYLOAD", () => scanKeys(payload));
+  const contextKeys = guardInput("INVALID_CONTEXT", () => scanKeys(context));
   if (payloadKeys.dangerous) keyAbort("DANGEROUS_PAYLOAD_KEY", payloadKeys.dangerous);
   if (contextKeys.dangerous) keyAbort("DANGEROUS_CONTEXT_KEY", contextKeys.dangerous);
   if (payloadKeys.invalid) keyAbort("INVALID_PAYLOAD_KEY", payloadKeys.invalid);
   if (contextKeys.invalid) keyAbort("INVALID_CONTEXT_KEY", contextKeys.invalid);
 
-  const payloadNumber = smallestNonFinite(payload);
-  const contextNumber = smallestNonFinite(context);
+  const payloadNumber = guardInput("INVALID_PAYLOAD", () => smallestNonFinite(payload));
+  const contextNumber = guardInput("INVALID_CONTEXT", () => smallestNonFinite(context));
   if (payloadNumber) abort("INVALID_PAYLOAD_NUMBER", { path: payloadNumber });
   if (contextNumber) abort("INVALID_CONTEXT_NUMBER", { path: contextNumber });
-  if (exceedsDepth(payload, 256)) abort("PAYLOAD_TOO_DEEP", { maxDepth: 256 });
-  if (exceedsDepth(context, 256)) abort("CONTEXT_TOO_DEEP", { maxDepth: 256 });
+  if (guardInput("INVALID_PAYLOAD", () => exceedsDepth(payload, 256))) abort("PAYLOAD_TOO_DEEP", { maxDepth: 256 });
+  if (guardInput("INVALID_CONTEXT", () => exceedsDepth(context, 256))) abort("CONTEXT_TOO_DEEP", { maxDepth: 256 });
 
   return {
     pipelineId,
-    payload: deepFreeze(cloneIJson(payload)),
-    context: deepFreeze(cloneIJson(context)),
+    payload: guardInput("INVALID_PAYLOAD", () => deepFreeze(cloneIJson(payload))),
+    context: guardInput("INVALID_CONTEXT", () => deepFreeze(cloneIJson(context))),
   };
 }
 
@@ -57,6 +57,7 @@ function assertHostJsonTree(root, code) {
   const active = new WeakSet();
   const stack = [{ value: root, leave: false }];
   try {
+    if (!isPlainObject(root)) abort(code, { expected: "object" });
     while (stack.length) {
       const frame = stack.pop();
       const value = frame.value;
@@ -87,7 +88,25 @@ function assertHostJsonTree(root, code) {
       }
     }
   } catch (error) {
-    if (error instanceof RuntimeAbort) throw error;
+    if (isRuntimeAbort(error)) throw error;
+    abort(code, { expected: "object" });
+  }
+}
+
+function readMember(input, name, code, details) {
+  try { return input?.[name]; }
+  catch (_) { abort(code, details); }
+}
+
+function hasMember(input, name, code) {
+  try { return !!input && Object.prototype.hasOwnProperty.call(input, name); }
+  catch (_) { abort(code, { expected: "object" }); }
+}
+
+function guardInput(code, operation) {
+  try { return operation(); }
+  catch (error) {
+    if (isRuntimeAbort(error)) throw error;
     abort(code, { expected: "object" });
   }
 }

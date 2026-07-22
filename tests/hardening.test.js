@@ -20,11 +20,42 @@ test("strict text adapter rejects duplicate members before JSON.parse loses them
   assert.throws(() => compileSnapshotText(text), CompilationError);
 });
 
+test("self-throwing snapshot proxy is contained as CompilationError", () => {
+  let hostile;
+  hostile = new Proxy({}, {
+    getPrototypeOf() { throw hostile; },
+    get() { throw hostile; },
+  });
+  assert.throws(() => compileSnapshot(hostile), CompilationError);
+});
+
 test("hostile payload proxy remains inside structured ABORT", () => {
   const prepared = compileSnapshot(snapshot());
   const payload = new Proxy({}, { ownKeys() { throw new Error("hostile"); } });
   assert.doesNotThrow(() => runPipeline(prepared, { pipelineId: "p", payload }));
   assert.equal(runPipeline(prepared, { pipelineId: "p", payload }).status, "ABORT");
+});
+
+test("self-throwing proxies cannot escape and retain payload/context classification", () => {
+  const prepared = compileSnapshot(snapshot());
+  let hostilePayload;
+  hostilePayload = new Proxy({}, { getPrototypeOf() { throw hostilePayload; } });
+  let hostileContext;
+  hostileContext = new Proxy({}, { getPrototypeOf() { throw hostileContext; } });
+
+  let payloadResult;
+  assert.doesNotThrow(() => {
+    payloadResult = runPipeline(prepared, { pipelineId: "p", payload: hostilePayload });
+  });
+  assert.equal(payloadResult.status, "ABORT");
+  assert.equal(payloadResult.error.code, "INVALID_PAYLOAD");
+
+  let contextResult;
+  assert.doesNotThrow(() => {
+    contextResult = runPipeline(prepared, { pipelineId: "p", payload: { x: "ok" }, context: hostileContext });
+  });
+  assert.equal(contextResult.status, "ABORT");
+  assert.equal(contextResult.error.code, "INVALID_CONTEXT");
 });
 
 test("sparse arrays are rejected as non-I-JSON input", () => {
@@ -86,6 +117,14 @@ test("nested quantifier executes through linear RE2 backend", () => {
   const prepared = compileSnapshot(value);
   const result = runPipeline(prepared, { pipelineId: "p", payload: { x: `${"a".repeat(100000)}!` } });
   assert.equal(result.status, "ERROR");
+});
+
+test("counted regex quantifiers reject leading zeros", () => {
+  const value = snapshot({
+    type: "rule", operator: "matches_regex", field: "x", value: "a{01}",
+    issue: { level: "ERROR", code: "X", message: "x" },
+  });
+  assert.throws(() => compileSnapshot(value), CompilationError);
 });
 
 test("deep valid control-flow graph compiles and executes without call-stack overflow", () => {

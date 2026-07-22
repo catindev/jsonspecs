@@ -15,6 +15,17 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           fetch-depth: 0
+      - name: Read pinned specification commit
+        id: spec
+        run: echo "commit=$(tr -d '\r\n' < tests/conformance/spec-commit.txt)" >> "$GITHUB_OUTPUT"
+      - name: Check out pinned conformance source
+        # actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          repository: jsonspecs/spec
+          ref: ${{ steps.spec.outputs.commit }}
+          path: .conformance-spec
+          persist-credentials: false
       # actions/setup-node@v6
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:

@@ -33,13 +33,30 @@ function createOperatorRegistry(custom = {}) {
 function assertClosedContract(name, schema) {
   if (schema.type !== "object" || schema.additionalProperties !== false || !isPlainObject(schema.properties))
     throw new TypeError(`operator ${name} schema must be a closed object schema`);
+  if (schema.patternProperties !== undefined)
+    throw new TypeError(`operator ${name} schema must enumerate property names explicitly`);
   for (const key of Object.keys(schema.properties)) {
     if (!CUSTOM_CONFIG_KEYS.has(key)) throw new TypeError(`operator ${name} schema declares unsupported config key ${key}`);
   }
+  assertRequiredDeclared(name, "configuration", schema);
   for (const key of ["inputs", "params"]) {
     const nested = schema.properties[key];
     if (nested && (nested.type !== "object" || nested.additionalProperties !== false || !isPlainObject(nested.properties)))
       throw new TypeError(`operator ${name} ${key} schema must declare a closed object`);
+    if (nested?.patternProperties !== undefined)
+      throw new TypeError(`operator ${name} ${key} schema must enumerate property names explicitly`);
+    if (nested) assertRequiredDeclared(name, key, nested);
+    const required = Array.isArray(nested?.required) ? nested.required : [];
+    if (key === "inputs" && nested && [...Object.keys(nested.properties), ...required].some((property) => !property))
+      throw new TypeError(`operator ${name} inputs schema names must be non-empty`);
+  }
+}
+
+function assertRequiredDeclared(name, label, schema) {
+  if (!Array.isArray(schema.required)) return;
+  for (const property of schema.required) {
+    if (!Object.prototype.hasOwnProperty.call(schema.properties, property))
+      throw new TypeError(`operator ${name} ${label} schema required names must be explicitly declared`);
   }
 }
 

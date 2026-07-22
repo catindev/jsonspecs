@@ -56,3 +56,82 @@ test("open external contract is rejected as deployment configuration", () => {
     operators: { "example.open": { schema: { type: "object", properties: {} }, evaluate: () => "PASS" } },
   }), /closed object schema/);
 });
+
+test("external contracts enumerate names at every controlled object level", () => {
+  assert.throws(() => createEngine({
+    operators: {
+      "example.dynamic": {
+        schema: {
+          type: "object",
+          properties: {},
+          patternProperties: { ".*": true },
+          additionalProperties: false,
+        },
+        evaluate: () => "PASS",
+      },
+    },
+  }), /enumerate property names explicitly/);
+
+  for (const key of ["inputs", "params"]) {
+    assert.throws(() => createEngine({
+      operators: {
+        "example.dynamic": {
+          schema: {
+            type: "object",
+            properties: {
+              [key]: {
+                type: "object",
+                properties: {},
+                patternProperties: { ".*": true },
+                additionalProperties: false,
+              },
+            },
+            additionalProperties: false,
+          },
+          evaluate: () => "PASS",
+        },
+      },
+    }), /enumerate property names explicitly/);
+  }
+});
+
+test("external input contract names must be non-empty", () => {
+  assert.throws(() => createEngine({
+    operators: {
+      "example.empty-input": {
+        schema: {
+          type: "object",
+          properties: {
+            inputs: {
+              type: "object",
+              properties: { "": { type: "string" } },
+              additionalProperties: false,
+            },
+          },
+          additionalProperties: false,
+        },
+        evaluate: () => "PASS",
+      },
+    },
+  }), /inputs schema names must be non-empty/);
+
+  assert.throws(() => createEngine({
+    operators: {
+      "example.empty-input": {
+        schema: {
+          type: "object",
+          properties: {
+            inputs: {
+              type: "object",
+              properties: {},
+              required: [""],
+              additionalProperties: false,
+            },
+          },
+          additionalProperties: false,
+        },
+        evaluate: () => "PASS",
+      },
+    },
+  }), /required names must be explicitly declared/);
+});

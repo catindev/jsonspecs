@@ -33,7 +33,7 @@ function render(node) {
     case "concat": return node.elements.map(render).join("");
     case "group": return `(?:${render(node.body)})`;
     case "anchor": return node.value === "$" ? "\\z" : "^";
-    case "quantified": return `${renderAtom(node.atom)}${node.quantifier}`;
+    case "quantified": return `${renderAtom(node.atom)}${node.quantifier.source}`;
     case "literal": return scalar(node.cp);
     case "class": return renderClass(node.ranges);
     default: throw new TypeError(`Unknown regex AST node ${node.type}`);

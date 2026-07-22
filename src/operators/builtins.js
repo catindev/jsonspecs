@@ -11,6 +11,7 @@
 
 const { compileRegex } = require("../regex");
 const { scalarEquals, orderedCompare, isOrderedLiteral } = require("./comparison");
+const { dictionaryHas } = require("./dictionary-index");
 const { deepFreeze } = require("../json/i-json");
 
 const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
@@ -68,8 +69,8 @@ const builtIns = {
   field_greater_or_equal_than_field: definition(secondField, compare((n) => n >= 0)),
   field_less_or_equal_than_field: definition(secondField, compare((n) => n <= 0)),
 
-  in_dictionary: definition(dictionaryRule, (i) => i.dictionary.some((entry) => scalarEquals(i.field, entry)) ? "PASS" : "FAIL"),
-  not_in_dictionary: definition(dictionaryRule, (i) => i.dictionary.some((entry) => scalarEquals(i.field, entry)) ? "FAIL" : "PASS"),
+  in_dictionary: definition(dictionaryRule, (i) => dictionaryHas(i.dictionary, i.field) ? "PASS" : "FAIL"),
+  not_in_dictionary: definition(dictionaryRule, (i) => dictionaryHas(i.dictionary, i.field) ? "FAIL" : "PASS"),
 };
 
 function definition(schema, evaluate, options = {}) {

@@ -10,7 +10,19 @@ const { execFileSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "jsonspecs-pack-"));
 function run(command, args, cwd = temp) {
-  return execFileSync(command, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, npm_config_cache: path.join(temp, "npm-cache") } });
+  return execFileSync(command, args, {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "inherit"],
+    env: {
+      ...process.env,
+      npm_config_cache: path.join(temp, "npm-cache"),
+      // Внешний `npm publish --dry-run` передаёт этот флаг дочернему npm. Для
+      // smoke-проверки архив должен быть создан физически, иначе install читает
+      // несуществующий путь, хотя `npm pack --json` сообщил имя файла.
+      npm_config_dry_run: "false",
+    },
+  });
 }
 
 try {
