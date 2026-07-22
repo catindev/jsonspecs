@@ -1,6 +1,10 @@
 # Changelog
 
-## 3.0.0
+All notable changes to this project will be documented in this file.
+
+## [Unreleased]
+
+## [3.0.0] - 2026-07-22
 
 - Implement `jsonspecs/spec` 1.0.0-rc.5 and snapshot formatVersion 2.
 - Unify check/predicate operators into PASS/FAIL/SKIP and add closed JSON Schema
@@ -20,15 +24,11 @@
 - Render an empty complemented character class as a valid never-matching RE2
   expression instead of rejecting the snapshot.
 - Validate and index dictionaries in linear time for constant-time built-in lookup.
-- Vendor and pass all 276 normative conformance fixtures from spec commit
-  `d7f07976b0fe004584217adf079c57caec102ab3`; CI verifies the source tree before
+- Vendor and pass all 281 normative conformance fixtures from spec commit
+  `853ecaaeaf0e775c2bb69cf3d46dae076e689f54`; CI verifies the source tree before
   running it and compares results through the JSON data model.
 - Remove legacy `role`, `strict`, `control`, trace-in-result, `payload.__context`,
   `required_context`, object steps and formatVersion 1 compilation.
-
-All notable changes to this project will be documented in this file.
-
-## [Unreleased]
 
 ## [2.4.0] - 2026-07-21
 

@@ -2,9 +2,9 @@
 
 `@jsonspecs/rules` 3.0.0 implements `jsonspecs/spec` 1.0.0-rc.5 and accepts only
 snapshot `formatVersion: 2`. The normative behavior is the projection defined by
-the [upstream specification](https://github.com/jsonspecs/spec/blob/d7f07976b0fe004584217adf079c57caec102ab3/SPEC.md).
-The vendored 276-fixture suite is pinned to spec commit
-`d7f07976b0fe004584217adf079c57caec102ab3` and is compared byte for byte with a
+the [upstream specification](https://github.com/jsonspecs/spec/blob/853ecaaeaf0e775c2bb69cf3d46dae076e689f54/SPEC.md).
+The vendored 281-fixture suite is pinned to spec commit
+`853ecaaeaf0e775c2bb69cf3d46dae076e689f54` and is compared byte for byte with a
 checkout of that commit before execution.
 
 The semver-stable package-root API is `createEngine`, `builtInOperators`,

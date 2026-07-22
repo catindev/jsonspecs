@@ -4,7 +4,7 @@
 контракт поведения и не переопределяет его.
 
 Нормативное поведение задано в
-[`jsonspecs/spec` 1.0.0-rc.5](https://github.com/jsonspecs/spec/blob/d7f07976b0fe004584217adf079c57caec102ab3/SPEC_RU.md).
+[`jsonspecs/spec` 1.0.0-rc.5](https://github.com/jsonspecs/spec/blob/853ecaaeaf0e775c2bb69cf3d46dae076e689f54/SPEC_RU.md).
 Точный коммит исходного корпуса записан в `tests/conformance/spec-commit.txt`.
 
 ## Компиляция

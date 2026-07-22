@@ -2,7 +2,7 @@
 
 ```bash
 npm test                  # package API tests
-npm run test:conformance  # source check and all 276 jsonspecs/spec RC.5 fixtures
+npm run test:conformance  # source check and all 281 jsonspecs/spec RC.5 fixtures
 npm run test:smoke        # executable README flow
 npm run test:perf         # broad compile/runtime budgets
 npm run test:pack         # install the actual npm tarball through CJS and ESM

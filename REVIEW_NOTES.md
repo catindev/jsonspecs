@@ -5,10 +5,10 @@
 - Source repository: `jsonspecs/rules`
 - Base commit: `107026b67131bcc874820968ae44a6f50aa2fd47`
 - Target specification: `jsonspecs/spec` 1.0.0-rc.5
-- Specification commit: `d7f07976b0fe004584217adf079c57caec102ab3`
+- Specification commit: `853ecaaeaf0e775c2bb69cf3d46dae076e689f54`
 
 The specification review found no blocking contradiction. Its repository gates and
-all 276 fixtures pass. One residual coverage note is handled defensively in this
+all 281 fixtures pass. One residual coverage note is handled defensively in this
 implementation: `any_filled.fields[]` rejects wildcard paths because aggregation is
 defined only for the primary `field` operand.
 
@@ -27,10 +27,10 @@ comments inside the code explain ordering, portability and security invariants.
 
 ## Verification
 
-- 20 package and hostile-JS regression tests include immutable built-ins,
+- 21 package and hostile-JS regression tests include immutable built-ins,
   self-throwing proxies, cyclic host values, huge sparse arrays, shared references
   and a 10,000-pipeline graph.
-- 276/276 normative conformance fixtures on Node.js 20, 22 and 24.
+- 281/281 normative conformance fixtures on Node.js 20, 22 and 24.
 - README smoke, package-install smoke for CJS/ESM, and performance smoke pass.
 - `npm ci` and full `prepublishOnly` pass from the lockfile.
 - `npm audit --omit=dev`: 0 vulnerabilities.
